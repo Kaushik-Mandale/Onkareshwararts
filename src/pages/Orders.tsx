@@ -8,10 +8,9 @@ import {
   cancelOrder,
   subscribePayments,
   getBusinessSettings,
-  subscribeSettings
+  subscribeSettings,
+  deleteOrder
 } from '../firebase/db';
-import { db } from '../firebase/config';
-import { doc, deleteDoc } from 'firebase/firestore';
 import type { Order, PaymentHistory } from '../types';
 import { 
   Search, 
@@ -135,10 +134,9 @@ export const Orders: React.FC = () => {
   };
 
   const handleDeleteOrder = async (orderNo: string) => {
-    if (!db) return;
     if (window.confirm(`CRITICAL: Are you sure you want to permanently delete order ${orderNo}?`)) {
       try {
-        await deleteDoc(doc(db, 'orders', orderNo));
+        await deleteOrder(orderNo);
         toast.success('Order deleted permanently.');
       } catch (err: any) {
         toast.error('Deletion failed: ' + err.message);

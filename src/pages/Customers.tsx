@@ -2,11 +2,11 @@
 import { useSearchParams } from 'react-router-dom';
 import { 
   subscribeCustomers, 
-  subscribeOrders 
+  subscribeOrders,
+  updateCustomerDetails,
+  deleteCustomer
 } from '../firebase/db';
 import type { Customer, Order } from '../types';
-import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase/config';
 import { 
   Search, 
   User, 
@@ -59,9 +59,8 @@ export const Customers: React.FC = () => {
   }, [searchParamQuery]);
 
   const handleUpdateNotes = async (customerId: string) => {
-    if (!db) return;
     try {
-      await updateDoc(doc(db, 'customers', customerId), {
+      await updateCustomerDetails(customerId, {
         notes: notesTemp.trim()
       });
       setEditNotesId(null);
@@ -72,9 +71,8 @@ export const Customers: React.FC = () => {
   };
 
   const handleUpdateTags = async (customerId: string) => {
-    if (!db) return;
     try {
-      await updateDoc(doc(db, 'customers', customerId), {
+      await updateCustomerDetails(customerId, {
         tags: tagsTemp
       });
       setEditTagsId(null);
@@ -87,8 +85,7 @@ export const Customers: React.FC = () => {
   const handleDeleteCustomer = async (customerId: string, customerName: string) => {
     if (window.confirm(`⚠️ WARNING: Delete customer "${customerName}" and all their booking history?\n\nThis action cannot be undone.`)) {
       try {
-        if (!db) throw new Error('Database not configured');
-        await deleteDoc(doc(db, 'customers', customerId));
+        await deleteCustomer(customerId);
         toast.success('Customer deleted successfully.');
       } catch (error: any) {
         toast.error('Failed to delete customer: ' + error.message);

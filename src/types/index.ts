@@ -9,6 +9,7 @@ export interface User {
 
 export interface Product {
   id: string; // Unique ID (e.g. BAR-123 or scan)
+  ownerId?: string;
   name: string;
   photoUrl: string;
   category: string;
@@ -30,6 +31,7 @@ export interface Product {
 
 export interface Customer {
   id: string;
+  ownerId?: string;
   name: string;
   mobile: string;
   address: string;
@@ -51,6 +53,7 @@ export type OrderStatus = 'booked' | 'pending' | 'delivered' | 'cancelled' | 're
 
 export interface Order {
   orderNumber: string; // GAN-2026-000001
+  ownerId?: string;
   products: {
     productId: string;
     name: string;
@@ -90,6 +93,7 @@ export interface Order {
 
 export interface PaymentHistory {
   id: string;
+  ownerId?: string;
   orderId: string;
   amount: number;
   method: 'Cash' | 'Online' | 'UPI' | 'Card' | 'Other';
@@ -101,6 +105,7 @@ export interface PaymentHistory {
 
 export interface InventoryHistory {
   id: string;
+  ownerId?: string;
   productId: string;
   productName: string;
   previousStock: number;
@@ -114,6 +119,7 @@ export interface InventoryHistory {
 
 export interface ActivityLog {
   id: string;
+  ownerId?: string;
   action: string;
   details: string;
   userId: string;
@@ -125,6 +131,7 @@ export interface ActivityLog {
 
 export interface Notification {
   id: string;
+  ownerId?: string;
   type: 'lowStock' | 'pendingPayment' | 'deliveryToday' | 'largeOrder' | 'paymentReceived' | 'newBooking' | 'deliveryCompleted';
   message: string;
   read: boolean;

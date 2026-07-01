@@ -12,7 +12,8 @@
   orderBy, 
   limit, 
   onSnapshot, 
-  runTransaction
+  runTransaction,
+  type DocumentReference
 } from 'firebase/firestore';
 import { db, auth } from './config';
 import type { 
@@ -26,12 +27,45 @@ import type {
   BusinessSettings 
 } from '../types';
 
+function getCurrentOwnerId(): string {
+  const ownerId = auth?.currentUser?.uid;
+  if (!ownerId) throw new Error('User must be signed in to access this data.');
+  return ownerId;
+}
+
+function getSettingsDocRef() {
+  const ownerId = getCurrentOwnerId();
+  if (!db) throw new Error('Database not configured');
+  return doc(db, 'settings', ownerId);
+}
+
+function assertResourceOwnedByCurrentUser(resourceOwnerId?: string) {
+  const ownerId = getCurrentOwnerId();
+  if (!ownerId || resourceOwnerId !== ownerId) {
+    throw new Error('Resource not found or access denied.');
+  }
+}
+
+async function assertDocumentOwnedByCurrentUser(ref: DocumentReference, resourceName: string): Promise<void> {
+  if (!db) throw new Error('Database not configured');
+  const ownerId = getCurrentOwnerId();
+
+  const snapshot = await getDoc(ref);
+  if (!snapshot.exists()) throw new Error(`${resourceName} not found.`);
+
+  const resourceOwnerId = snapshot.data()?.ownerId as string | undefined;
+  if (resourceOwnerId !== ownerId) {
+    throw new Error(`${resourceName} access denied.`);
+  }
+}
+
 // Helper to log user activity
 export async function logActivity(action: string, details: string) {
   if (!db) return;
   try {
     const user = auth?.currentUser;
     const activity: Omit<ActivityLog, 'id'> = {
+      ownerId: user?.uid || 'system',
       action,
       details,
       userId: user?.uid || 'system',
@@ -50,14 +84,24 @@ export async function logActivity(action: string, details: string) {
 // PRODUCTS CRUD
 // ==========================================
 export async function getProducts(): Promise<Product[]> {
-  if (!db) return [];
-  const snapshot = await getDocs(query(collection(db, 'products'), where('status', '!=', 'deleted')));
+  const ownerId = getCurrentOwnerId();
+  if (!db || !ownerId) return [];
+  const snapshot = await getDocs(query(
+    collection(db, 'products'),
+    where('status', '!=', 'deleted'),
+    where('ownerId', '==', ownerId)
+  ));
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
 }
 
 export function subscribeProducts(callback: (products: Product[]) => void) {
-  if (!db) return () => {};
-  const q = query(collection(db, 'products'), where('status', '!=', 'deleted'));
+  const ownerId = getCurrentOwnerId();
+  if (!db || !ownerId) return () => {};
+  const q = query(
+    collection(db, 'products'),
+    where('status', '!=', 'deleted'),
+    where('ownerId', '==', ownerId)
+  );
   return onSnapshot(q, (snapshot) => {
     const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
     callback(products);
@@ -66,9 +110,12 @@ export function subscribeProducts(callback: (products: Product[]) => void) {
 
 export async function addProduct(product: Omit<Product, 'createdAt' | 'updatedAt'>): Promise<string> {
   if (!db) throw new Error('Database not configured');
+  const ownerId = getCurrentOwnerId();
+  if (!ownerId) throw new Error('User must be signed in to add products.');
   const now = new Date().toISOString();
   const productData = {
     ...product,
+    ownerId,
     createdAt: now,
     updatedAt: now
   };
@@ -82,6 +129,7 @@ export async function addProduct(product: Omit<Product, 'createdAt' | 'updatedAt
 
 export async function updateProduct(id: string, updates: Partial<Omit<Product, 'id' | 'createdAt' | 'updatedAt'>>): Promise<void> {
   if (!db) throw new Error('Database not configured');
+  await assertDocumentOwnedByCurrentUser(doc(db, 'products', id), 'Product');
   const now = new Date().toISOString();
   
   // Get previous stock for history logging if quantity is changing
@@ -111,6 +159,7 @@ export async function updateProduct(id: string, updates: Partial<Omit<Product, '
 
 export async function archiveProduct(id: string): Promise<void> {
   if (!db) throw new Error('Database not configured');
+  await assertDocumentOwnedByCurrentUser(doc(db, 'products', id), 'Product');
   await updateDoc(doc(db, 'products', id), {
     status: 'archived',
     updatedAt: new Date().toISOString()
@@ -120,6 +169,7 @@ export async function archiveProduct(id: string): Promise<void> {
 
 export async function restoreProduct(id: string): Promise<void> {
   if (!db) throw new Error('Database not configured');
+  await assertDocumentOwnedByCurrentUser(doc(db, 'products', id), 'Product');
   await updateDoc(doc(db, 'products', id), {
     status: 'active',
     updatedAt: new Date().toISOString()
@@ -129,6 +179,7 @@ export async function restoreProduct(id: string): Promise<void> {
 
 export async function deleteProductSoft(id: string): Promise<void> {
   if (!db) throw new Error('Database not configured');
+  await assertDocumentOwnedByCurrentUser(doc(db, 'products', id), 'Product');
   await updateDoc(doc(db, 'products', id), {
     status: 'deleted',
     updatedAt: new Date().toISOString()
@@ -143,6 +194,7 @@ async function logStockChange(productId: string, productName: string, previousSt
   if (!db) return;
   const user = auth?.currentUser;
   const history: Omit<InventoryHistory, 'id'> = {
+    ownerId: user?.uid || 'system',
     productId,
     productName,
     previousStock,
@@ -176,8 +228,14 @@ async function logStockChange(productId: string, productName: string, previousSt
 }
 
 export function subscribeInventoryHistory(callback: (history: InventoryHistory[]) => void) {
-  if (!db) return () => {};
-  const q = query(collection(db, 'inventory_history'), orderBy('timestamp', 'desc'), limit(100));
+  const ownerId = getCurrentOwnerId();
+  if (!db || !ownerId) return () => {};
+  const q = query(
+    collection(db, 'inventory_history'),
+    where('ownerId', '==', ownerId),
+    orderBy('timestamp', 'desc'),
+    limit(100)
+  );
   return onSnapshot(q, (snapshot) => {
     callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as InventoryHistory)));
   });
@@ -187,30 +245,47 @@ export function subscribeInventoryHistory(callback: (history: InventoryHistory[]
 // CUSTOMERS CRM
 // ==========================================
 export async function getCustomers(): Promise<Customer[]> {
-  if (!db) return [];
-  const snapshot = await getDocs(collection(db, 'customers'));
+  const ownerId = getCurrentOwnerId();
+  if (!db || !ownerId) return [];
+  const snapshot = await getDocs(query(
+    collection(db, 'customers'),
+    where('ownerId', '==', ownerId),
+    orderBy('name', 'asc')
+  ));
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
 }
 
 export function subscribeCustomers(callback: (customers: Customer[]) => void) {
-  if (!db) return () => {};
-  const q = query(collection(db, 'customers'), orderBy('name', 'asc'));
+  const ownerId = getCurrentOwnerId();
+  if (!db || !ownerId) return () => {};
+  const q = query(
+    collection(db, 'customers'),
+    where('ownerId', '==', ownerId),
+    orderBy('name', 'asc')
+  );
   return onSnapshot(q, (snapshot) => {
     callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer)));
   });
 }
 
 export async function lookupCustomerByMobile(mobile: string): Promise<Customer | null> {
-  if (!db) return null;
-  const q = query(collection(db, 'customers'), where('mobile', '==', mobile.trim()), limit(1));
+  const ownerId = getCurrentOwnerId();
+  if (!db || !ownerId) return null;
+  const q = query(
+    collection(db, 'customers'),
+    where('ownerId', '==', ownerId),
+    where('mobile', '==', mobile.trim()),
+    limit(1)
+  );
   const snapshot = await getDocs(q);
   if (snapshot.empty) return null;
   const firstDoc = snapshot.docs[0];
   return { id: firstDoc.id, ...firstDoc.data() } as Customer;
 }
 
-export async function saveCustomer(customer: Omit<Customer, 'id' | 'joinedDate' | 'lastVisit'>): Promise<string> {
-  if (!db) throw new Error('Database not configured');
+export async function saveCustomer(customer: Omit<Customer, 'id' | 'joinedDate' | 'lastVisit' | 'ownerId'>): Promise<string> {
+  const ownerId = getCurrentOwnerId();
+  if (!db || !ownerId) throw new Error('User must be signed in to save customers.');
   const existing = await lookupCustomerByMobile(customer.mobile);
   const now = new Date().toISOString();
   
@@ -226,6 +301,7 @@ export async function saveCustomer(customer: Omit<Customer, 'id' | 'joinedDate' 
     const newCustomer: Customer = {
       ...customer,
       id: customerId,
+      ownerId,
       joinedDate: now,
       lastVisit: now
     };
@@ -234,16 +310,43 @@ export async function saveCustomer(customer: Omit<Customer, 'id' | 'joinedDate' 
   }
 }
 
+export async function updateCustomerDetails(customerId: string, updates: Partial<Customer>): Promise<void> {
+  if (!db) throw new Error('Database not configured');
+  await assertDocumentOwnedByCurrentUser(doc(db, 'customers', customerId), 'Customer');
+  await updateDoc(doc(db, 'customers', customerId), updates);
+}
+
+export async function deleteCustomer(customerId: string): Promise<void> {
+  if (!db) throw new Error('Database not configured');
+  await assertDocumentOwnedByCurrentUser(doc(db, 'customers', customerId), 'Customer');
+  await deleteDoc(doc(db, 'customers', customerId));
+}
+
+export async function deleteOrder(orderNumber: string): Promise<void> {
+  if (!db) throw new Error('Database not configured');
+  await assertDocumentOwnedByCurrentUser(doc(db, 'orders', orderNumber), 'Order');
+  await deleteDoc(doc(db, 'orders', orderNumber));
+}
+
+export async function deletePayment(paymentId: string): Promise<void> {
+  if (!db) throw new Error('Database not configured');
+  await assertDocumentOwnedByCurrentUser(doc(db, 'payments', paymentId), 'Payment');
+  await deleteDoc(doc(db, 'payments', paymentId));
+}
+
 // ==========================================
 // BOOKING & ORDER WORKFLOW (WITH TRANSACTION)
 // ==========================================
 export async function createOrder(order: Omit<Order, 'createdBy' | 'createdAt'>): Promise<string> {
   if (!db) throw new Error('Database not configured');
+  const ownerId = getCurrentOwnerId();
+  if (!ownerId) throw new Error('User must be signed in to create orders.');
   const user = auth?.currentUser;
   const username = user?.displayName || user?.email?.split('@')[0] || 'Staff';
   
   const finalOrder: Order = {
     ...order,
+    ownerId,
     createdBy: username,
     createdAt: new Date().toISOString()
   };
@@ -345,6 +448,7 @@ export async function createOrder(order: Omit<Order, 'createdBy' | 'createdAt'>)
     const paymentId = 'PAY-' + Math.floor(100000 + Math.random() * 900000);
     const ledgerEntry: PaymentHistory = {
       id: paymentId,
+      ownerId,
       orderId: order.orderNumber,
       amount: order.payment.paid,
       method: order.payment.method === 'Split' ? 'Online' : order.payment.method, // simplification
@@ -368,8 +472,13 @@ export async function createOrder(order: Omit<Order, 'createdBy' | 'createdAt'>)
 
 // Subscribe to Live Orders
 export function subscribeOrders(callback: (orders: Order[]) => void) {
-  if (!db) return () => {};
-  const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+  const ownerId = getCurrentOwnerId();
+  if (!db || !ownerId) return () => {};
+  const q = query(
+    collection(db, 'orders'),
+    where('ownerId', '==', ownerId),
+    orderBy('createdAt', 'desc')
+  );
   return onSnapshot(q, (snapshot) => {
     callback(snapshot.docs.map(doc => ({ orderNumber: doc.id, ...doc.data() } as Order)));
   });
@@ -379,7 +488,9 @@ export async function getOrder(orderNumber: string): Promise<Order | null> {
   if (!db) return null;
   const snapshot = await getDoc(doc(db, 'orders', orderNumber));
   if (!snapshot.exists()) return null;
-  return { orderNumber: snapshot.id, ...snapshot.data() } as Order;
+  const order = { orderNumber: snapshot.id, ...snapshot.data() } as Order;
+  assertResourceOwnedByCurrentUser(order.ownerId);
+  return order;
 }
 
 // Update Order Payment Ledger
@@ -393,6 +504,7 @@ export async function addPaymentToOrder(orderNumber: string, amount: number, met
   if (!orderDoc.exists()) throw new Error('Order not found');
   
   const order = orderDoc.data() as Order;
+  await assertDocumentOwnedByCurrentUser(orderDocRef, 'Order');
   if (amount > order.payment.remaining) {
     throw new Error(`Payment exceeds remaining balance of ₹${order.payment.remaining}`);
   }
@@ -412,6 +524,7 @@ export async function addPaymentToOrder(orderNumber: string, amount: number, met
   const paymentId = 'PAY-' + Math.floor(100000 + Math.random() * 900000);
   const ledger: PaymentHistory = {
     id: paymentId,
+    ownerId: getCurrentOwnerId() || 'system',
     orderId: orderNumber,
     amount,
     method,
@@ -450,6 +563,7 @@ export async function refundOrder(orderNumber: string, amount: number, notes: st
   if (!orderDoc.exists()) throw new Error('Order not found');
   
   const order = orderDoc.data() as Order;
+  assertResourceOwnedByCurrentUser(order.ownerId);
   if (amount > order.payment.paid) {
     throw new Error(`Refund amount exceeds total paid amount of ₹${order.payment.paid}`);
   }
@@ -469,6 +583,7 @@ export async function refundOrder(orderNumber: string, amount: number, notes: st
   const paymentId = 'PAY-' + Math.floor(100000 + Math.random() * 900000);
   const ledger: PaymentHistory = {
     id: paymentId,
+    ownerId: getCurrentOwnerId() || 'system',
     orderId: orderNumber,
     amount,
     method: 'Cash', // Default refund method
@@ -503,6 +618,7 @@ export async function cancelOrder(orderNumber: string, reason: string): Promise<
   if (!orderDoc.exists()) throw new Error('Order not found');
   
   const order = orderDoc.data() as Order;
+  await assertDocumentOwnedByCurrentUser(orderDocRef, 'Order');
   if (order.status === 'delivered') {
     throw new Error('Delivered orders cannot be cancelled.');
   }
@@ -552,6 +668,7 @@ export async function confirmDelivery(orderNumber: string, deviceDetails: string
   if (!orderDoc.exists()) throw new Error('Order not found');
 
   const order = orderDoc.data() as Order;
+  await assertDocumentOwnedByCurrentUser(orderDocRef, 'Order');
   if (order.status === 'delivered') {
     throw new Error('Order has already been delivered!');
   }
@@ -579,8 +696,14 @@ export async function confirmDelivery(orderNumber: string, deviceDetails: string
 // PAYMENTS LEDGER QUERYING
 // ==========================================
 export function subscribePayments(callback: (payments: PaymentHistory[]) => void) {
-  if (!db) return () => {};
-  const q = query(collection(db, 'payments'), orderBy('timestamp', 'desc'), limit(200));
+  const ownerId = getCurrentOwnerId();
+  if (!db || !ownerId) return () => {};
+  const q = query(
+    collection(db, 'payments'),
+    where('ownerId', '==', ownerId),
+    orderBy('timestamp', 'desc'),
+    limit(200)
+  );
   return onSnapshot(q, (snapshot) => {
     callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PaymentHistory)));
   });
@@ -595,7 +718,9 @@ export async function createNotification(
   metadata?: Record<string, any>
 ): Promise<void> {
   if (!db) return;
+  const ownerId = getCurrentOwnerId();
   const notification: Omit<Notification, 'id'> = {
+    ownerId: ownerId || 'system',
     type,
     message,
     read: false,
@@ -606,8 +731,14 @@ export async function createNotification(
 }
 
 export function subscribeNotifications(callback: (notifications: Notification[]) => void) {
-  if (!db) return () => {};
-  const q = query(collection(db, 'notifications'), orderBy('createdAt', 'desc'), limit(50));
+  const ownerId = getCurrentOwnerId();
+  if (!db || !ownerId) return () => {};
+  const q = query(
+    collection(db, 'notifications'),
+    where('ownerId', '==', ownerId),
+    orderBy('createdAt', 'desc'),
+    limit(50)
+  );
   return onSnapshot(q, (snapshot) => {
     callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notification)));
   });
@@ -619,8 +750,13 @@ export async function markNotificationAsRead(id: string): Promise<void> {
 }
 
 export async function markAllNotificationsAsRead(): Promise<void> {
-  if (!db) return;
-  const snapshot = await getDocs(query(collection(db, 'notifications'), where('read', '==', false)));
+  const ownerId = getCurrentOwnerId();
+  if (!db || !ownerId) return;
+  const snapshot = await getDocs(query(
+    collection(db, 'notifications'),
+    where('ownerId', '==', ownerId),
+    where('read', '==', false)
+  ));
   const batchPromises = snapshot.docs.map(doc => updateDoc(doc.ref, { read: true }));
   await Promise.all(batchPromises);
 }
@@ -628,7 +764,6 @@ export async function markAllNotificationsAsRead(): Promise<void> {
 // ==========================================
 // BUSINESS SETTINGS
 // ==========================================
-const SETTINGS_DOC_ID = 'business_info';
 
 export async function getBusinessSettings(): Promise<BusinessSettings> {
   const defaultSettings: BusinessSettings = {
@@ -657,7 +792,7 @@ export async function getBusinessSettings(): Promise<BusinessSettings> {
 
   if (!db) return defaultSettings;
   try {
-    const snap = await getDoc(doc(db, 'settings', SETTINGS_DOC_ID));
+    const snap = await getDoc(getSettingsDocRef());
     if (snap.exists()) {
       const stored = snap.data() as BusinessSettings;
       const migrated: BusinessSettings = {
@@ -696,13 +831,13 @@ export async function getBusinessSettings(): Promise<BusinessSettings> {
       }
 
       if (changed) {
-        await setDoc(doc(db, 'settings', SETTINGS_DOC_ID), migrated, { merge: true });
+        await setDoc(getSettingsDocRef(), migrated, { merge: true });
       }
 
       return migrated;
     }
     // Write defaults if not exist
-    await setDoc(doc(db, 'settings', SETTINGS_DOC_ID), defaultSettings);
+    await setDoc(getSettingsDocRef(), defaultSettings);
     return defaultSettings;
   } catch (e) {
     console.error('Settings lookup failed, using default settings:', e);
@@ -712,14 +847,14 @@ export async function getBusinessSettings(): Promise<BusinessSettings> {
 
 export async function updateBusinessSettings(updates: Partial<BusinessSettings>): Promise<void> {
   if (!db) throw new Error('Database not configured');
-  await setDoc(doc(db, 'settings', SETTINGS_DOC_ID), updates, { merge: true });
+  await setDoc(getSettingsDocRef(), updates, { merge: true });
   await logActivity('Settings Updated', 'Updated business configurations');
 }
 
 // Subscribe to Settings changes
 export function subscribeSettings(callback: (settings: BusinessSettings) => void) {
   if (!db) return () => {};
-  return onSnapshot(doc(db, 'settings', SETTINGS_DOC_ID), (snapshot) => {
+  return onSnapshot(getSettingsDocRef(), (snapshot) => {
     if (snapshot.exists()) {
       callback(snapshot.data() as BusinessSettings);
     }
@@ -730,8 +865,14 @@ export function subscribeSettings(callback: (settings: BusinessSettings) => void
 // ACTIVITY LOGS
 // ==========================================
 export function subscribeActivityLogs(callback: (logs: ActivityLog[]) => void) {
-  if (!db) return () => {};
-  const q = query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(150));
+  const ownerId = getCurrentOwnerId();
+  if (!db || !ownerId) return () => {};
+  const q = query(
+    collection(db, 'activity_logs'),
+    where('ownerId', '==', ownerId),
+    orderBy('timestamp', 'desc'),
+    limit(150)
+  );
   return onSnapshot(q, (snapshot) => {
     callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ActivityLog)));
   });
@@ -742,34 +883,36 @@ export function subscribeActivityLogs(callback: (logs: ActivityLog[]) => void) {
 // ==========================================
 export async function resetDatabaseForFreshStart(): Promise<void> {
   if (!db) throw new Error('Database not configured');
+  const ownerId = getCurrentOwnerId();
+  if (!ownerId) throw new Error('User must be signed in to reset database.');
 
   try {
-    // Delete all orders
-    const ordersSnap = await getDocs(collection(db, 'orders'));
+    // Delete all orders for the current user
+    const ordersSnap = await getDocs(query(collection(db, 'orders'), where('ownerId', '==', ownerId)));
     for (const doc of ordersSnap.docs) {
       await deleteDoc(doc.ref);
     }
 
-    // Delete all payments/ledger entries
-    const paymentsSnap = await getDocs(collection(db, 'payments'));
+    // Delete all payments/ledger entries for the current user
+    const paymentsSnap = await getDocs(query(collection(db, 'payments'), where('ownerId', '==', ownerId)));
     for (const doc of paymentsSnap.docs) {
       await deleteDoc(doc.ref);
     }
 
-    // Delete all activity logs
-    const logsSnap = await getDocs(collection(db, 'activity_logs'));
+    // Delete all activity logs for the current user
+    const logsSnap = await getDocs(query(collection(db, 'activity_logs'), where('ownerId', '==', ownerId)));
     for (const doc of logsSnap.docs) {
       await deleteDoc(doc.ref);
     }
 
-    // Delete all inventory history
-    const inventorySnap = await getDocs(collection(db, 'inventory_history'));
+    // Delete all inventory history for the current user
+    const inventorySnap = await getDocs(query(collection(db, 'inventory_history'), where('ownerId', '==', ownerId)));
     for (const doc of inventorySnap.docs) {
       await deleteDoc(doc.ref);
     }
 
-    // Reset all customers (clear order counts and totals)
-    const customersSnap = await getDocs(collection(db, 'customers'));
+    // Reset all customers for current user (clear order counts and totals)
+    const customersSnap = await getDocs(query(collection(db, 'customers'), where('ownerId', '==', ownerId)));
     for (const customerDoc of customersSnap.docs) {
       await updateDoc(customerDoc.ref, {
         totalOrders: 0,
@@ -782,11 +925,14 @@ export async function resetDatabaseForFreshStart(): Promise<void> {
 
     // Log this action to a new log entry (after clearing)
     await addDoc(collection(db, 'activity_logs'), {
+      ownerId,
       action: 'Database Reset',
       details: 'Performed fresh start - cleared orders, payments, logs, inventory history, and reset customer totals',
       timestamp: new Date().toISOString(),
       userId: auth?.currentUser?.uid || 'system',
-      userEmail: auth?.currentUser?.email || 'system'
+      username: auth?.currentUser?.displayName || auth?.currentUser?.email?.split('@')[0] || 'System',
+      ip: '127.0.0.1',
+      device: navigator.userAgent
     });
 
     console.log('Database reset completed successfully');

@@ -1,9 +1,8 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { db } from '../firebase/config';
-import { doc, deleteDoc } from 'firebase/firestore';
 import { 
   subscribePayments, 
-  subscribeOrders 
+  subscribeOrders,
+  deletePayment
 } from '../firebase/db';
 import type { PaymentHistory } from '../types';
 import { 
@@ -41,8 +40,7 @@ export const Payments: React.FC = () => {
   const handleDeletePayment = async (paymentId: string, orderId: string) => {
     if (window.confirm(`Are you sure you want to delete payment record ${paymentId} for order ${orderId}? This action cannot be undone.`)) {
       try {
-        if (!db) throw new Error('Database not configured');
-        await deleteDoc(doc(db, 'payments', paymentId));
+        await deletePayment(paymentId);
         toast.success('Payment record deleted successfully.');
       } catch (error: any) {
         toast.error('Failed to delete payment: ' + error.message);
