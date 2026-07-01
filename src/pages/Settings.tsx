@@ -3,7 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { 
   getBusinessSettings, 
   updateBusinessSettings, 
-  logActivity 
+  logActivity,
+  resetDatabaseForFreshStart
 } from '../firebase/db';
 import { db } from '../firebase/config';
 import { 
@@ -29,7 +30,8 @@ import {
   KeyRound, 
   UserPlus, 
   Trash2, 
-  AlertTriangle 
+  AlertTriangle,
+  RotateCcw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
@@ -74,6 +76,9 @@ export const Settings: React.FC = () => {
   const [newRole, setNewRole] = useState<'admin' | 'staff'>('staff');
   const [newStaffPassword, setNewStaffPassword] = useState('ram@26');
   const [userCreating, setUserCreating] = useState(false);
+
+  // Database Reset State
+  const [resetting, setResetting] = useState(false);
 
   const loadUsers = useCallback(async () => {
     if (!db || currentUser?.role !== 'admin') return;
@@ -302,6 +307,29 @@ export const Settings: React.FC = () => {
       await logActivity('Backup Exported', 'Manual JSON database backup downloaded');
     } catch (e: any) {
       toast.error('Backup failed: ' + e.message);
+    }
+  };
+
+  const handleResetDatabase = async () => {
+    // Triple confirmation to prevent accidental data loss
+    if (!window.confirm('⚠️ WARNING: This will delete ALL orders, payments, logs, and inventory history!\n\nThis action cannot be undone. Continue?')) {
+      return;
+    }
+
+    if (!window.confirm('🔴 FINAL CONFIRMATION: Delete all transactional data?\n\n(Products and customer records will be preserved)')) {
+      return;
+    }
+
+    setResetting(true);
+    try {
+      await resetDatabaseForFreshStart();
+      toast.success('✅ Database reset successfully! Fresh start ready.');
+      await logActivity('Database Reset', 'Cleared orders, payments, logs, and inventory history for fresh start');
+    } catch (error: any) {
+      toast.error('❌ Reset failed: ' + error.message);
+      console.error('Database reset error:', error);
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -785,6 +813,29 @@ export const Settings: React.FC = () => {
                 <Upload className="h-4.5 w-4.5 text-gold" />
                 <span>Upload &amp; Restore JSON</span>
               </label>
+            </div>
+          </div>
+
+          {/* Reset Database card */}
+          <div className="bg-card border border-red-500/20 rounded-2xl p-5 shadow-sm space-y-4 md:col-span-2 lg:col-span-1">
+            <h3 className="font-bold text-xs text-foreground uppercase tracking-wider border-b border-red-500/20 pb-3 flex items-center"><RotateCcw className="h-4.5 w-4.5 text-red-500 mr-2" /> Fresh Start Reset</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Clear all transactional data (orders, payments, activity logs, inventory history) for a fresh start. **Products and customer records are preserved.**
+            </p>
+            <div className="p-4 bg-red-500/5 border border-red-500/15 rounded-xl text-xs text-red-700 dark:text-red-400 flex items-start space-x-2 leading-relaxed">
+              <AlertTriangle className="h-4.5 w-4.5 shrink-0 mt-0.5" />
+              <span><strong>DANGER:</strong> This action cannot be undone! Requires double confirmation.</span>
+            </div>
+            
+            <div className="pt-2">
+              <button
+                onClick={handleResetDatabase}
+                disabled={resetting}
+                className="flex items-center justify-center space-x-1.5 px-6 py-3 bg-gradient-to-r from-red-600 to-red-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-red-500/20 hover:brightness-110 active:scale-98 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RotateCcw className={`h-4.5 w-4.5 ${resetting ? 'animate-spin' : ''}`} />
+                <span>{resetting ? 'Resetting...' : 'Delete All Transaction Data'}</span>
+              </button>
             </div>
           </div>
         </div>

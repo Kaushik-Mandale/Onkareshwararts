@@ -6,6 +6,7 @@
   getDoc, 
   getDocs, 
   updateDoc, 
+  deleteDoc,
   query, 
   where, 
   orderBy, 
@@ -734,4 +735,51 @@ export function subscribeActivityLogs(callback: (logs: ActivityLog[]) => void) {
   return onSnapshot(q, (snapshot) => {
     callback(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ActivityLog)));
   });
+}
+
+// ==========================================
+// DATABASE RESET FOR FRESH START
+// ==========================================
+export async function resetDatabaseForFreshStart(): Promise<void> {
+  if (!db) throw new Error('Database not configured');
+
+  try {
+    // Delete all orders
+    const ordersSnap = await getDocs(collection(db, 'orders'));
+    for (const doc of ordersSnap.docs) {
+      await deleteDoc(doc.ref);
+    }
+
+    // Delete all payments/ledger entries
+    const paymentsSnap = await getDocs(collection(db, 'payments'));
+    for (const doc of paymentsSnap.docs) {
+      await deleteDoc(doc.ref);
+    }
+
+    // Delete all activity logs
+    const logsSnap = await getDocs(collection(db, 'activity_logs'));
+    for (const doc of logsSnap.docs) {
+      await deleteDoc(doc.ref);
+    }
+
+    // Delete all inventory history
+    const inventorySnap = await getDocs(collection(db, 'inventory_history'));
+    for (const doc of inventorySnap.docs) {
+      await deleteDoc(doc.ref);
+    }
+
+    // Log this action to a new log entry (after clearing)
+    await addDoc(collection(db, 'activity_logs'), {
+      action: 'Database Reset',
+      details: 'Performed fresh start - cleared orders, payments, logs, and inventory history',
+      timestamp: new Date().toISOString(),
+      userId: auth?.currentUser?.uid || 'system',
+      userEmail: auth?.currentUser?.email || 'system'
+    });
+
+    console.log('Database reset completed successfully');
+  } catch (e) {
+    console.error('Database reset failed:', e);
+    throw new Error('Failed to reset database: ' + (e instanceof Error ? e.message : 'Unknown error'));
+  }
 }
