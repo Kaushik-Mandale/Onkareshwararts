@@ -318,21 +318,21 @@ export const Reports: React.FC = () => {
         {/* Gross Sales */}
         <div className="bg-card border border-border p-4 rounded-2xl text-center space-y-1">
           <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Gross Sales Value</span>
-          <h3 className="text-xl font-extrabold text-foreground">â‚¹{grossSales.toLocaleString()}</h3>
+          <h3 className="text-xl font-extrabold text-foreground">₹{grossSales.toLocaleString()}</h3>
           <p className="text-[9px] text-muted-foreground">Booked items pricing</p>
         </div>
 
         {/* Total Collected */}
         <div className="bg-card border border-border p-4 rounded-2xl text-center space-y-1">
           <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Total Receipts Collected</span>
-          <h3 className="text-xl font-extrabold text-green-600">â‚¹{totalCollected.toLocaleString()}</h3>
+          <h3 className="text-xl font-extrabold text-green-600">₹{totalCollected.toLocaleString()}</h3>
           <p className="text-[9px] text-muted-foreground">Cash + Digital inputs</p>
         </div>
 
         {/* outstanding receivable */}
         <div className="bg-card border border-border p-4 rounded-2xl text-center space-y-1">
           <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Receivables Dues</span>
-          <h3 className="text-xl font-extrabold text-red-500">â‚¹{duesOutstanding.toLocaleString()}</h3>
+          <h3 className="text-xl font-extrabold text-red-500">₹{duesOutstanding.toLocaleString()}</h3>
           <p className="text-[9px] text-muted-foreground">Outstanding balances</p>
         </div>
 

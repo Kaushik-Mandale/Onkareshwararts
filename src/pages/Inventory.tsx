@@ -621,7 +621,7 @@ export const Inventory: React.FC = () => {
                     <div className="flex justify-between items-baseline pt-1">
                       <div>
                         <span className="text-[9px] text-muted-foreground block">Selling Price</span>
-                        <span className="text-sm font-bold text-foreground">â‚¹{p.sellingPrice.toLocaleString()}</span>
+                        <span className="text-sm font-bold text-foreground">₹{p.sellingPrice.toLocaleString()}</span>
                       </div>
                       <div className="text-right">
                         <span className="text-[9px] text-muted-foreground block">Stock Value</span>
@@ -784,7 +784,7 @@ export const Inventory: React.FC = () => {
 
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Selling Price (â‚¹) *</label>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Selling Price (₹) *</label>
                   <input
                     type="number"
                     required
@@ -918,7 +918,7 @@ export const Inventory: React.FC = () => {
             <div className="flex justify-center border p-4 bg-white">
               <Barcode value={barcodePrintProduct.barcode} />
             </div>
-            <p className="font-bold text-xs mt-2">Price: â‚¹{barcodePrintProduct.sellingPrice.toLocaleString()}</p>
+            <p className="font-bold text-xs mt-2">Price: ₹{barcodePrintProduct.sellingPrice.toLocaleString()}</p>
             <p className="text-[8px] text-slate-500">Onkareshwararts (Internal barcode)</p>
           </div>
         </div>
