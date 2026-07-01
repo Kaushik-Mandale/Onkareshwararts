@@ -12,9 +12,9 @@ export interface Product {
   name: string;
   photoUrl: string;
   category: string;
-  purchaseCost: number;
+  purchaseCost: number; // retained internally for old imported records
   sellingPrice: number;
-  profit: number; // sellingPrice - purchaseCost
+  profit: number; // retained internally for old imported records
   quantity: number;
   size: string; // size details, e.g., "1.5 feet"
   weight: string; // weight details, e.g., "5 kg"

@@ -116,12 +116,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } else {
           // If auth exists but no Firestore profile, build a fallback based on email
-          const username = fUser.email?.split('@')[0] || 'staff';
-          const role = username === 'admin' ? 'admin' : 'staff';
+          const username = fUser.email?.split('@')[0] || 'ram2026';
+          const role = username === 'vivek2026' ? 'admin' : 'staff';
           const fallbackUser: AppUser = {
             uid: fUser.uid,
             username,
-            name: username === 'admin' ? 'Administrator' : 'Staff Member',
+            name: username === 'vivek2026' ? 'Vivek' : 'Ram',
             role,
             status: 'active',
             createdAt: new Date().toISOString()
@@ -178,11 +178,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const userDoc = await getDoc(userDocRef);
       
       if (!userDoc.exists()) {
-        const role = username.toLowerCase() === 'admin' ? 'admin' : 'staff';
+        const role = username.toLowerCase() === 'vivek2026' ? 'admin' : 'staff';
         const newAppUser: AppUser = {
           uid: fUser.uid,
           username: username.trim().toLowerCase(),
-          name: username.toLowerCase() === 'admin' ? 'Administrator' : 'Staff Member',
+          name: username.toLowerCase() === 'vivek2026' ? 'Vivek' : 'Ram',
           role,
           status: 'active',
           createdAt: new Date().toISOString()
@@ -206,8 +206,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Authentication error:', error.code, error.message);
       
       // 2. Self-Provisioning: If user is not found, and username/password matches the default, create them
-      const isDefaultAdmin = username.toLowerCase() === 'admin' && password === 'Ganpati@123';
-      const isDefaultStaff = username.toLowerCase() === 'staff' && password === 'Ganpati@123';
+      const isDefaultAdmin = username.toLowerCase() === 'vivek2026' && password === 'vivek@26';
+      const isDefaultStaff = username.toLowerCase() === 'ram2026' && password === 'ram@26';
 
       if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
         if (isDefaultAdmin || isDefaultStaff) {
@@ -216,11 +216,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const userCredential = await createUserWithEmailAndPassword(auth, email, password);
             const fUser = userCredential.user;
             
-            const role = username.toLowerCase() === 'admin' ? 'admin' : 'staff';
+            const role = username.toLowerCase() === 'vivek2026' ? 'admin' : 'staff';
             const newAppUser: AppUser = {
               uid: fUser.uid,
               username: username.trim().toLowerCase(),
-              name: username.toLowerCase() === 'admin' ? 'Administrator' : 'Staff Member',
+              name: username.toLowerCase() === 'vivek2026' ? 'Vivek' : 'Ram',
               role,
               status: 'active',
               createdAt: new Date().toISOString()

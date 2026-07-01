@@ -80,8 +80,8 @@ The app can self-provision these default users on first login after Firebase Aut
 
 | Role | Username | Password |
 | --- | --- | --- |
-| Admin | `admin` | `Ganpati@123` |
-| Staff | `staff` | `Ganpati@123` |
+| Admin | `vivek2026` | `vivek@26` |
+| Staff | `ram2026` | `ram@26` |
 
 After setup, change passwords and manage staff access from the Settings module.
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   addProduct, 
@@ -119,7 +119,6 @@ export const Inventory: React.FC = () => {
   const [name, setName] = useState('');
   const [photoUrl, setPhotoUrl] = useState('');
   const [category, setCategory] = useState('Dagdusheth Shape');
-  const [purchaseCost, setPurchaseCost] = useState(0);
   const [sellingPrice, setSellingPrice] = useState(0);
   const [quantity, setQuantity] = useState(0);
   const [size, setSize] = useState('2 feet');
@@ -149,7 +148,6 @@ export const Inventory: React.FC = () => {
       setName(editingProduct.name);
       setPhotoUrl(editingProduct.photoUrl);
       setCategory(editingProduct.category);
-      setPurchaseCost(editingProduct.purchaseCost);
       setSellingPrice(editingProduct.sellingPrice);
       setQuantity(editingProduct.quantity);
       setSize(editingProduct.size);
@@ -165,7 +163,6 @@ export const Inventory: React.FC = () => {
       setName('');
       setPhotoUrl('');
       setCategory('Dagdusheth Shape');
-      setPurchaseCost(0);
       setSellingPrice(0);
       setQuantity(10);
       setSize('1.5 feet');
@@ -205,8 +202,8 @@ export const Inventory: React.FC = () => {
   // Submit Product Form
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || purchaseCost <= 0 || sellingPrice <= 0 || quantity < 0) {
-      toast.error('Please fill in name, costs, and quantity.');
+    if (!name || sellingPrice <= 0 || quantity < 0) {
+      toast.error('Please fill in name, selling price, and quantity.');
       return;
     }
 
@@ -215,9 +212,9 @@ export const Inventory: React.FC = () => {
       name: name.trim(),
       photoUrl: photoUrl.trim(),
       category,
-      purchaseCost,
+      purchaseCost: editingProduct?.purchaseCost || sellingPrice,
       sellingPrice,
-      profit: sellingPrice - purchaseCost,
+      profit: 0,
       quantity,
       size,
       weight,
@@ -273,9 +270,9 @@ export const Inventory: React.FC = () => {
 
   // CSV Export
   const handleExportCSV = () => {
-    const headers = 'ID,Name,Category,Material,Size,Weight,PurchaseCost,SellingPrice,Profit,Quantity,LowStockLimit,Barcode,Status\n';
+    const headers = 'ID,Name,Category,Material,Size,Weight,SellingPrice,Quantity,LowStockLimit,Barcode,Status\n';
     const rows = products.map(p => 
-      `"${p.id}","${p.name}","${p.category}","${p.material}","${p.size}","${p.weight}",${p.purchaseCost},${p.sellingPrice},${p.profit},${p.quantity},${p.lowStockLimit},"${p.barcode}","${p.status}"`
+      `"${p.id}","${p.name}","${p.category}","${p.material}","${p.size}","${p.weight}",${p.sellingPrice},${p.quantity},${p.lowStockLimit},"${p.barcode}","${p.status}"`
     ).join('\n');
     
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
@@ -310,7 +307,7 @@ export const Inventory: React.FC = () => {
       for (const line of dataLines) {
         // Simple CSV splitter (regex to respect quotes)
         const parts = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
-        if (!parts || parts.length < 10) {
+        if (!parts || parts.length < 9) {
           errorCount++;
           continue;
         }
@@ -322,11 +319,10 @@ export const Inventory: React.FC = () => {
         const pMat = clean(parts[3]);
         const pSize = clean(parts[4]);
         const pWeight = clean(parts[5]);
-        const pCost = parseFloat(parts[6]) || 0;
-        const pPrice = parseFloat(parts[7]) || 0;
-        const pQty = parseInt(parts[9]) || 0;
-        const pLimit = parseInt(parts[10]) || 3;
-        const pBarcode = clean(parts[11]) || pId;
+        const pPrice = parseFloat(parts[6]) || 0;
+        const pQty = parseInt(parts[7]) || 0;
+        const pLimit = parseInt(parts[8]) || 3;
+        const pBarcode = clean(parts[9] || '') || pId;
 
         const productPayload: Product = {
           id: pId,
@@ -336,9 +332,9 @@ export const Inventory: React.FC = () => {
           material: pMat,
           size: pSize,
           weight: pWeight,
-          purchaseCost: pCost,
+          purchaseCost: pPrice,
           sellingPrice: pPrice,
-          profit: pPrice - pCost,
+          profit: 0,
           quantity: pQty,
           lowStockLimit: pLimit,
           description: '',
@@ -398,7 +394,6 @@ export const Inventory: React.FC = () => {
     if (sortBy === 'price-desc') return b.sellingPrice - a.sellingPrice;
     if (sortBy === 'qty-asc') return a.quantity - b.quantity;
     if (sortBy === 'qty-desc') return b.quantity - a.quantity;
-    if (sortBy === 'profit') return b.profit - a.profit;
     return 0;
   });
 
@@ -501,7 +496,6 @@ export const Inventory: React.FC = () => {
               <option value="price-desc">Price (High to Low)</option>
               <option value="qty-asc">Stock (Low to High)</option>
               <option value="qty-desc">Stock (High to Low)</option>
-              <option value="profit">Profit Margin</option>
             </select>
           </div>
         </div>
@@ -588,11 +582,11 @@ export const Inventory: React.FC = () => {
                     <div className="flex justify-between items-baseline pt-1">
                       <div>
                         <span className="text-[9px] text-muted-foreground block">Selling Price</span>
-                        <span className="text-sm font-bold text-foreground">₹{p.sellingPrice.toLocaleString()}</span>
+                        <span className="text-sm font-bold text-foreground">â‚¹{p.sellingPrice.toLocaleString()}</span>
                       </div>
                       <div className="text-right">
-                        <span className="text-[9px] text-muted-foreground block">Profit Margin</span>
-                        <span className="text-xs font-semibold text-green-600">₹{p.profit.toLocaleString()}</span>
+                        <span className="text-[9px] text-muted-foreground block">Stock Value</span>
+                        <span className="text-xs font-semibold text-green-600">₹{(p.sellingPrice * p.quantity).toLocaleString()}</span>
                       </div>
                     </div>
                   </div>
@@ -749,21 +743,9 @@ export const Inventory: React.FC = () => {
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Purchase Cost (₹) *</label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    placeholder="1200"
-                    value={purchaseCost || ''}
-                    onChange={(e) => setPurchaseCost(parseFloat(e.target.value) || 0)}
-                    className="w-full px-4 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-saffron/30"
-                  />
-                </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Selling Price (₹) *</label>
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Selling Price (â‚¹) *</label>
                   <input
                     type="number"
                     required
@@ -799,6 +781,7 @@ export const Inventory: React.FC = () => {
                     onChange={(e) => setLowStockLimit(parseInt(e.target.value) || 0)}
                     className="w-full px-4 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-saffron/30"
                   />
+                  <p className="text-[9px] text-muted-foreground">Alert when available stock is this number or lower.</p>
                 </div>
 
                 <div className="space-y-1">
@@ -896,7 +879,7 @@ export const Inventory: React.FC = () => {
             <div className="flex justify-center border p-4 bg-white">
               <Barcode value={barcodePrintProduct.barcode} />
             </div>
-            <p className="font-bold text-xs mt-2">Price: ₹{barcodePrintProduct.sellingPrice.toLocaleString()}</p>
+            <p className="font-bold text-xs mt-2">Price: â‚¹{barcodePrintProduct.sellingPrice.toLocaleString()}</p>
             <p className="text-[8px] text-slate-500">Onkareshwararts (Internal barcode)</p>
           </div>
         </div>

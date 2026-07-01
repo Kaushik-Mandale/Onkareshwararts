@@ -41,7 +41,7 @@ const AnimatedCounter: React.FC<{ value: number; prefix?: string; suffix?: strin
   value, 
   prefix = '', 
   suffix = '', 
-  duration = 800 
+  duration = 180 
 }) => {
   const [count, setCount] = useState(0);
 
@@ -57,8 +57,12 @@ const AnimatedCounter: React.FC<{ value: number; prefix?: string; suffix?: strin
     let current = start;
     const increment = end > start ? 1 : -1;
     const stepTime = Math.abs(Math.floor(duration / range));
+    const step = Math.max(1, Math.ceil(Math.abs(range) / 20));
     const timer = setInterval(() => {
-      current += increment;
+      current += increment * step;
+      if ((increment > 0 && current > end) || (increment < 0 && current < end)) {
+        current = end;
+      }
       setCount(current);
       if (current === end) {
         clearInterval(timer);
@@ -119,7 +123,7 @@ export const Dashboard: React.FC = () => {
   const totalProducts = products.filter(p => p.status === 'active').length;
   const totalStockValue = products
     .filter(p => p.status === 'active')
-    .reduce((sum, p) => sum + (p.purchaseCost * p.quantity), 0);
+    .reduce((sum, p) => sum + (p.sellingPrice * p.quantity), 0);
   
   const lowStockProds = products.filter(p => p.status === 'active' && p.quantity > 0 && p.quantity <= p.lowStockLimit);
   const outOfStockCount = products.filter(p => p.status === 'active' && p.quantity === 0).length;

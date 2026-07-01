@@ -81,7 +81,7 @@ export const Login: React.FC = () => {
               <input
                 type="text"
                 required
-                placeholder="admin or staff"
+                placeholder="vivek2026 or ram2026"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-saffron/30 focus:border-saffron transition-all"
@@ -128,7 +128,7 @@ export const Login: React.FC = () => {
           <div className="p-3 bg-saffron/5 dark:bg-saffron/10 border border-saffron/10 dark:border-saffron/20 rounded-xl text-[10px] text-muted-foreground leading-relaxed flex items-start space-x-2">
             <ShieldCheck className="h-4.5 w-4.5 text-gold shrink-0 mt-0.5" />
             <span>
-              <strong>First time?</strong> Log in with `admin` / `Ganpati@123` or `staff` / `Ganpati@123`. 
+              <strong>First time?</strong> Log in with `vivek2026` / `vivek@26` or `ram2026` / `ram@26`. 
               The application will automatically register and provision them securely in your Firebase auth instance.
             </span>
           </div>

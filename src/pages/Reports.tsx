@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { subscribeProducts, subscribeOrders, subscribePayments } from '../firebase/db';
-import type { Product, Order, PaymentHistory } from '../types';
+import { subscribeOrders, subscribePayments } from '../firebase/db';
+import type { Order, PaymentHistory } from '../types';
 import { 
   BarChart as RechartsBarChart, 
   Bar as RechartsBar, 
@@ -16,8 +16,7 @@ import {
 import { 
   FileText, 
   Download, 
-  Calendar, 
-  TrendingUp
+  Calendar
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
@@ -25,7 +24,6 @@ import { toast } from 'sonner';
 import dayjs from 'dayjs';
 
 export const Reports: React.FC = () => {
-  const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [payments, setPayments] = useState<PaymentHistory[]>([]);
 
@@ -35,12 +33,10 @@ export const Reports: React.FC = () => {
   const [endDate, setEndDate] = useState(dayjs().format('YYYY-MM-DD'));
 
   useEffect(() => {
-    const unsubProds = subscribeProducts(setProducts);
     const unsubOrders = subscribeOrders(setOrders);
     const unsubPayments = subscribePayments(setPayments);
 
     return () => {
-      unsubProds();
       unsubOrders();
       unsubPayments();
     };
@@ -92,20 +88,6 @@ export const Reports: React.FC = () => {
   const duesOutstanding = filteredOrders
     .filter(o => o.status !== 'cancelled' && o.status !== 'refunded')
     .reduce((sum, o) => sum + o.payment.remaining, 0);
-
-  // Profit Margins (Purchase Cost vs Selling Price on sold items in bookings)
-  let cogs = 0; // Cost of Goods Sold
-  filteredOrders.filter(o => o.status !== 'cancelled' && o.status !== 'refunded').forEach(order => {
-    order.products.forEach(item => {
-      // Find matching catalog product
-      const catalogProd = products.find(p => p.id === item.productId);
-      const unitCost = catalogProd ? catalogProd.purchaseCost : (item.price * 0.5); // fallback cost if not found
-      cogs += (unitCost * item.quantity);
-    });
-  });
-
-  const grossProfit = grossSales - cogs;
-  const profitPercentage = grossSales > 0 ? Math.round((grossProfit / grossSales) * 100) : 0;
 
   // Split payments
   const cashCollection = filteredPayments
@@ -159,9 +141,6 @@ export const Reports: React.FC = () => {
       ["Gross Booked Sales Value", `Rs. ${grossSales.toLocaleString()}`],
       ["Net Receipts Collected", `Rs. ${totalCollected.toLocaleString()}`],
       ["Uncollected Dues Outstanding", `Rs. ${duesOutstanding.toLocaleString()}`],
-      ["Cost of Goods Sold (COGS)", `Rs. ${cogs.toLocaleString()}`],
-      ["Gross Profit Margin", `Rs. ${grossProfit.toLocaleString()} (${profitPercentage}%)`],
-      [],
       ["COLLECTION METHODS", ""],
       ["Cash", `Rs. ${cashCollection.toLocaleString()}`],
       ["Online/UPI/Cards", `Rs. ${onlineCollection.toLocaleString()}`],
@@ -210,9 +189,7 @@ export const Reports: React.FC = () => {
       { name: 'Total Bookings Received', val: `${totalBookings} orders` },
       { name: 'Gross Booked Sales Value', val: `Rs. ${grossSales.toLocaleString()}` },
       { name: 'Net Receipts Collected', val: `Rs. ${totalCollected.toLocaleString()}` },
-      { name: 'Outstanding Unpaid Dues', val: `Rs. ${duesOutstanding.toLocaleString()}` },
-      { name: 'Cost of Goods Sold (COGS)', val: `Rs. ${cogs.toLocaleString()}` },
-      { name: 'Gross Net Profit', val: `Rs. ${grossProfit.toLocaleString()} (${profitPercentage}%)` }
+      { name: 'Outstanding Unpaid Dues', val: `Rs. ${duesOutstanding.toLocaleString()}` }
     ];
 
     stats.forEach(item => {
@@ -263,7 +240,7 @@ export const Reports: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-foreground">Analytics &amp; Reports</h2>
-          <p className="text-sm text-muted-foreground">Monitor sales charts, gross margins, outstanding dues, and export ledger accounts</p>
+          <p className="text-sm text-muted-foreground">Monitor sales charts, outstanding dues, and export ledger accounts</p>
         </div>
         <div className="flex space-x-2">
           <button
@@ -330,7 +307,7 @@ export const Reports: React.FC = () => {
       </div>
 
       {/* --- FINANCIAL KPIS GRID --- */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Booked */}
         <div className="bg-card border border-border p-4 rounded-2xl text-center space-y-1">
           <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Total Bookings</span>
@@ -359,15 +336,6 @@ export const Reports: React.FC = () => {
           <p className="text-[9px] text-muted-foreground">Outstanding balances</p>
         </div>
 
-        {/* Net Profit margins */}
-        <div className="bg-card border border-border p-4 rounded-2xl text-center space-y-1">
-          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider block">Gross Profit (Estim.)</span>
-          <h3 className="text-xl font-extrabold text-foreground flex items-center justify-center">
-            â‚¹{grossProfit.toLocaleString()}
-            <TrendingUp className="h-4 w-4 text-green-600 ml-1 shrink-0" />
-          </h3>
-          <p className="text-[9px] text-green-600 font-semibold">{profitPercentage}% Profit Margin</p>
-        </div>
       </div>
 
       {/* --- GRAPH ANALYSIS ROW --- */}

@@ -72,7 +72,7 @@ export const Settings: React.FC = () => {
   const [newUsername, setNewUsername] = useState('');
   const [newName, setNewName] = useState('');
   const [newRole, setNewRole] = useState<'admin' | 'staff'>('staff');
-  const [newStaffPassword, setNewStaffPassword] = useState('Ganpati@123');
+  const [newStaffPassword, setNewStaffPassword] = useState('ram@26');
   const [userCreating, setUserCreating] = useState(false);
 
   const loadUsers = useCallback(async () => {
@@ -235,7 +235,7 @@ export const Settings: React.FC = () => {
       toast.success(`Staff user "${cleanUsername}" created! They can log in immediately with default password.`);
       setNewUsername('');
       setNewName('');
-      setNewStaffPassword('Ganpati@123');
+      setNewStaffPassword('ram@26');
       loadUsers();
       await logActivity('User Created', `Created staff user account: ${cleanUsername}`);
     } catch (err: any) {
@@ -247,7 +247,7 @@ export const Settings: React.FC = () => {
 
   const handleDeleteUser = async (userToDelete: AppUser) => {
     if (!db) return;
-    if (userToDelete.username === 'admin') {
+    if (userToDelete.username === 'vivek2026') {
       toast.error('The default system admin account cannot be deleted.');
       return;
     }
@@ -723,7 +723,7 @@ export const Settings: React.FC = () => {
 
                     <button
                       onClick={() => handleDeleteUser(user)}
-                      disabled={user.username === 'admin'}
+                      disabled={user.username === 'vivek2026'}
                       className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg disabled:opacity-30 cursor-pointer"
                       title="Delete User"
                     >
