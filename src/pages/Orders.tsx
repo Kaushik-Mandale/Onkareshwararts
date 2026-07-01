@@ -7,7 +7,8 @@ import {
   refundOrder, 
   cancelOrder,
   subscribePayments,
-  getBusinessSettings
+  getBusinessSettings,
+  subscribeSettings
 } from '../firebase/db';
 import { db } from '../firebase/config';
 import { doc, deleteDoc } from 'firebase/firestore';
@@ -59,11 +60,15 @@ export const Orders: React.FC = () => {
   useEffect(() => {
     const unsubOrders = subscribeOrders(setOrders);
     const unsubPayments = subscribePayments(setPayments);
+    // Subscribe to real-time business settings changes
+    const settingsUnsubscribe = subscribeSettings(setBusinessSettings);
+    // Fallback: fetch settings if subscription doesn't work
     getBusinessSettings().then(setBusinessSettings);
 
     return () => {
       unsubOrders();
       unsubPayments();
+      settingsUnsubscribe();
     };
   }, []);
 

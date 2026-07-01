@@ -3,7 +3,8 @@ import {
   subscribeProducts, 
   lookupCustomerByMobile, 
   createOrder, 
-  getBusinessSettings 
+  getBusinessSettings,
+  subscribeSettings
 } from '../firebase/db';
 import type { Product, Customer, Order } from '../types';
 import { 
@@ -87,9 +88,15 @@ export const NewBooking: React.FC = () => {
       setProducts(data.filter(p => p.status === 'active'));
     });
     
+    // Subscribe to real-time business settings changes
+    const settingsUnsubscribe = subscribeSettings(setBusinessSettings);
+    // Fallback: fetch settings if subscription doesn't work
     getBusinessSettings().then(setBusinessSettings);
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      settingsUnsubscribe();
+    };
   }, []);
 
   // Autofill customer lookup on mobile input
