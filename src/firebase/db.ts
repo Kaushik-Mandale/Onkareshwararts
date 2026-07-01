@@ -1,4 +1,4 @@
-﻿import { 
+import { 
   collection, 
   doc, 
   setDoc, 
@@ -33,10 +33,29 @@ function getCurrentOwnerId(): string {
   return ownerId;
 }
 
+function getUsernamePath(): string {
+  const email = auth?.currentUser?.email;
+  if (!email) {
+    const uid = auth?.currentUser?.uid;
+    if (!uid) return 'system';
+    return uid;
+  }
+  return email.split('@')[0].toLowerCase();
+}
+
+export function getColRef(colName: string) {
+  if (!db) throw new Error('Database not configured');
+  return collection(db, 'users_data', getUsernamePath(), colName);
+}
+
+export function getDocRef(colName: string, id: string) {
+  if (!db) throw new Error('Database not configured');
+  return doc(db, 'users_data', getUsernamePath(), colName, id);
+}
+
 function getSettingsDocRef() {
   const ownerId = getCurrentOwnerId();
-  if (!db) throw new Error('Database not configured');
-  return doc(db, 'settings', ownerId);
+  return getDocRef('settings', ownerId);
 }
 
 function assertResourceOwnedByCurrentUser(resourceOwnerId?: string) {
@@ -74,7 +93,7 @@ export async function logActivity(action: string, details: string) {
       ip: '127.0.0.1', // Client side IP lookup could be added or simulated
       device: navigator.userAgent
     };
-    await addDoc(collection(db, 'activity_logs'), activity);
+    await addDoc(getColRef('activity_logs'), activity);
   } catch (e) {
     console.error('Failed to write activity log:', e);
   }
@@ -87,7 +106,7 @@ export async function getProducts(): Promise<Product[]> {
   const ownerId = getCurrentOwnerId();
   if (!db || !ownerId) return [];
   const snapshot = await getDocs(query(
-    collection(db, 'products'),
+    getColRef('products'),
     where('status', '!=', 'deleted'),
     where('ownerId', '==', ownerId)
   ));
@@ -98,7 +117,7 @@ export function subscribeProducts(callback: (products: Product[]) => void) {
   const ownerId = getCurrentOwnerId();
   if (!db || !ownerId) return () => {};
   const q = query(
-    collection(db, 'products'),
+    getColRef('products'),
     where('status', '!=', 'deleted'),
     where('ownerId', '==', ownerId)
   );
@@ -119,7 +138,7 @@ export async function addProduct(product: Omit<Product, 'createdAt' | 'updatedAt
     createdAt: now,
     updatedAt: now
   };
-  await setDoc(doc(db, 'products', product.id), productData);
+  await setDoc(getDocRef('products', product.id), productData);
   await logActivity('Product Added', `Added product ${product.name} (ID: ${product.id})`);
   
   // Log stock history
@@ -129,12 +148,12 @@ export async function addProduct(product: Omit<Product, 'createdAt' | 'updatedAt
 
 export async function updateProduct(id: string, updates: Partial<Omit<Product, 'id' | 'createdAt' | 'updatedAt'>>): Promise<void> {
   if (!db) throw new Error('Database not configured');
-  await assertDocumentOwnedByCurrentUser(doc(db, 'products', id), 'Product');
+  await assertDocumentOwnedByCurrentUser(getDocRef('products', id), 'Product');
   const now = new Date().toISOString();
   
   // Get previous stock for history logging if quantity is changing
   if (updates.quantity !== undefined) {
-    const prevDoc = await getDoc(doc(db, 'products', id));
+    const prevDoc = await getDoc(getDocRef('products', id));
     if (prevDoc.exists()) {
       const prevData = prevDoc.data() as Product;
       if (prevData.quantity !== updates.quantity) {
@@ -153,14 +172,14 @@ export async function updateProduct(id: string, updates: Partial<Omit<Product, '
     ...updates,
     updatedAt: now
   };
-  await updateDoc(doc(db, 'products', id), updatedData);
+  await updateDoc(getDocRef('products', id), updatedData);
   await logActivity('Product Updated', `Updated product ID: ${id}`);
 }
 
 export async function archiveProduct(id: string): Promise<void> {
   if (!db) throw new Error('Database not configured');
-  await assertDocumentOwnedByCurrentUser(doc(db, 'products', id), 'Product');
-  await updateDoc(doc(db, 'products', id), {
+  await assertDocumentOwnedByCurrentUser(getDocRef('products', id), 'Product');
+  await updateDoc(getDocRef('products', id), {
     status: 'archived',
     updatedAt: new Date().toISOString()
   });
@@ -169,8 +188,8 @@ export async function archiveProduct(id: string): Promise<void> {
 
 export async function restoreProduct(id: string): Promise<void> {
   if (!db) throw new Error('Database not configured');
-  await assertDocumentOwnedByCurrentUser(doc(db, 'products', id), 'Product');
-  await updateDoc(doc(db, 'products', id), {
+  await assertDocumentOwnedByCurrentUser(getDocRef('products', id), 'Product');
+  await updateDoc(getDocRef('products', id), {
     status: 'active',
     updatedAt: new Date().toISOString()
   });
@@ -179,8 +198,8 @@ export async function restoreProduct(id: string): Promise<void> {
 
 export async function deleteProductSoft(id: string): Promise<void> {
   if (!db) throw new Error('Database not configured');
-  await assertDocumentOwnedByCurrentUser(doc(db, 'products', id), 'Product');
-  await updateDoc(doc(db, 'products', id), {
+  await assertDocumentOwnedByCurrentUser(getDocRef('products', id), 'Product');
+  await updateDoc(getDocRef('products', id), {
     status: 'deleted',
     updatedAt: new Date().toISOString()
   });
@@ -205,10 +224,10 @@ async function logStockChange(productId: string, productName: string, previousSt
     userId: user?.uid || 'system',
     username: user?.displayName || user?.email?.split('@')[0] || 'System'
   };
-  await addDoc(collection(db, 'inventory_history'), history);
+  await addDoc(getColRef('inventory_history'), history);
 
   // Check low stock triggers
-  const productDoc = await getDoc(doc(db, 'products', productId));
+  const productDoc = await getDoc(getDocRef('products', productId));
   if (productDoc.exists()) {
     const product = productDoc.data() as Product;
     if (newStock === 0) {
@@ -231,7 +250,7 @@ export function subscribeInventoryHistory(callback: (history: InventoryHistory[]
   const ownerId = getCurrentOwnerId();
   if (!db || !ownerId) return () => {};
   const q = query(
-    collection(db, 'inventory_history'),
+    getColRef('inventory_history'),
     where('ownerId', '==', ownerId),
     orderBy('timestamp', 'desc'),
     limit(100)
@@ -248,7 +267,7 @@ export async function getCustomers(): Promise<Customer[]> {
   const ownerId = getCurrentOwnerId();
   if (!db || !ownerId) return [];
   const snapshot = await getDocs(query(
-    collection(db, 'customers'),
+    getColRef('customers'),
     where('ownerId', '==', ownerId),
     orderBy('name', 'asc')
   ));
@@ -259,7 +278,7 @@ export function subscribeCustomers(callback: (customers: Customer[]) => void) {
   const ownerId = getCurrentOwnerId();
   if (!db || !ownerId) return () => {};
   const q = query(
-    collection(db, 'customers'),
+    getColRef('customers'),
     where('ownerId', '==', ownerId),
     orderBy('name', 'asc')
   );
@@ -272,7 +291,7 @@ export async function lookupCustomerByMobile(mobile: string): Promise<Customer |
   const ownerId = getCurrentOwnerId();
   if (!db || !ownerId) return null;
   const q = query(
-    collection(db, 'customers'),
+    getColRef('customers'),
     where('ownerId', '==', ownerId),
     where('mobile', '==', mobile.trim()),
     limit(1)
@@ -294,7 +313,7 @@ export async function saveCustomer(customer: Omit<Customer, 'id' | 'joinedDate' 
       ...customer,
       lastVisit: now
     };
-    await updateDoc(doc(db, 'customers', existing.id), updatedCustomer);
+    await updateDoc(getDocRef('customers', existing.id), updatedCustomer);
     return existing.id;
   } else {
     const customerId = 'CUST-' + Math.floor(100000 + Math.random() * 900000);
@@ -305,33 +324,33 @@ export async function saveCustomer(customer: Omit<Customer, 'id' | 'joinedDate' 
       joinedDate: now,
       lastVisit: now
     };
-    await setDoc(doc(db, 'customers', customerId), newCustomer);
+    await setDoc(getDocRef('customers', customerId), newCustomer);
     return customerId;
   }
 }
 
 export async function updateCustomerDetails(customerId: string, updates: Partial<Customer>): Promise<void> {
   if (!db) throw new Error('Database not configured');
-  await assertDocumentOwnedByCurrentUser(doc(db, 'customers', customerId), 'Customer');
-  await updateDoc(doc(db, 'customers', customerId), updates);
+  await assertDocumentOwnedByCurrentUser(getDocRef('customers', customerId), 'Customer');
+  await updateDoc(getDocRef('customers', customerId), updates);
 }
 
 export async function deleteCustomer(customerId: string): Promise<void> {
   if (!db) throw new Error('Database not configured');
-  await assertDocumentOwnedByCurrentUser(doc(db, 'customers', customerId), 'Customer');
-  await deleteDoc(doc(db, 'customers', customerId));
+  await assertDocumentOwnedByCurrentUser(getDocRef('customers', customerId), 'Customer');
+  await deleteDoc(getDocRef('customers', customerId));
 }
 
 export async function deleteOrder(orderNumber: string): Promise<void> {
   if (!db) throw new Error('Database not configured');
-  await assertDocumentOwnedByCurrentUser(doc(db, 'orders', orderNumber), 'Order');
-  await deleteDoc(doc(db, 'orders', orderNumber));
+  await assertDocumentOwnedByCurrentUser(getDocRef('orders', orderNumber), 'Order');
+  await deleteDoc(getDocRef('orders', orderNumber));
 }
 
 export async function deletePayment(paymentId: string): Promise<void> {
   if (!db) throw new Error('Database not configured');
-  await assertDocumentOwnedByCurrentUser(doc(db, 'payments', paymentId), 'Payment');
-  await deleteDoc(doc(db, 'payments', paymentId));
+  await assertDocumentOwnedByCurrentUser(getDocRef('payments', paymentId), 'Payment');
+  await deleteDoc(getDocRef('payments', paymentId));
 }
 
 // ==========================================
@@ -352,7 +371,7 @@ export async function createOrder(order: Omit<Order, 'createdBy' | 'createdAt'>)
   };
 
   // Prevent duplicate order number
-  const checkDoc = await getDoc(doc(db, 'orders', order.orderNumber));
+  const checkDoc = await getDoc(getDocRef('orders', order.orderNumber));
   if (checkDoc.exists()) {
     throw new Error(`Order ${order.orderNumber} already exists. Please regenerate order number.`);
   }
@@ -361,7 +380,7 @@ export async function createOrder(order: Omit<Order, 'createdBy' | 'createdAt'>)
   await runTransaction(db, async (transaction) => {
     // 1. Verify and update stock for all products in the order
     for (const item of order.products) {
-      const pDocRef = doc(db!, 'products', item.productId);
+      const pDocRef = getDocRef('products', item.productId);
       const pSnapshot = await transaction.get(pDocRef);
       
       if (!pSnapshot.exists()) {
@@ -390,12 +409,12 @@ export async function createOrder(order: Omit<Order, 'createdBy' | 'createdAt'>)
     }
 
     // 2. Write the order document
-    transaction.set(doc(db!, 'orders', order.orderNumber), finalOrder);
+    transaction.set(getDocRef('orders', order.orderNumber), finalOrder);
   });
 
   // Log stock histories and triggers
   for (const item of order.products) {
-    const pDoc = await getDoc(doc(db, 'products', item.productId));
+    const pDoc = await getDoc(getDocRef('products', item.productId));
     if (pDoc.exists()) {
       const pData = pDoc.data() as Product;
       // Previous stock was pData.quantity + item.quantity
@@ -422,7 +441,7 @@ export async function createOrder(order: Omit<Order, 'createdBy' | 'createdAt'>)
     if (totalOrders >= 5 && !tags.includes('VIP')) tags.push('VIP');
     if (totalOrders >= 2 && !tags.includes('Repeat Customer')) tags.push('Repeat Customer');
 
-    await updateDoc(doc(db, 'customers', customer.id), {
+    await updateDoc(getDocRef('customers', customer.id), {
       totalOrders,
       totalAmount,
       remainingDue,
@@ -457,7 +476,7 @@ export async function createOrder(order: Omit<Order, 'createdBy' | 'createdAt'>)
       recordedBy: username,
       notes: 'Initial deposit at booking'
     };
-    await setDoc(doc(db, 'payments', paymentId), ledgerEntry);
+    await setDoc(getDocRef('payments', paymentId), ledgerEntry);
   }
 
   await createNotification(
@@ -475,7 +494,7 @@ export function subscribeOrders(callback: (orders: Order[]) => void) {
   const ownerId = getCurrentOwnerId();
   if (!db || !ownerId) return () => {};
   const q = query(
-    collection(db, 'orders'),
+    getColRef('orders'),
     where('ownerId', '==', ownerId),
     orderBy('createdAt', 'desc')
   );
@@ -486,7 +505,7 @@ export function subscribeOrders(callback: (orders: Order[]) => void) {
 
 export async function getOrder(orderNumber: string): Promise<Order | null> {
   if (!db) return null;
-  const snapshot = await getDoc(doc(db, 'orders', orderNumber));
+  const snapshot = await getDoc(getDocRef('orders', orderNumber));
   if (!snapshot.exists()) return null;
   const order = { orderNumber: snapshot.id, ...snapshot.data() } as Order;
   assertResourceOwnedByCurrentUser(order.ownerId);
@@ -499,7 +518,7 @@ export async function addPaymentToOrder(orderNumber: string, amount: number, met
   const user = auth?.currentUser;
   const username = user?.displayName || user?.email?.split('@')[0] || 'Staff';
 
-  const orderDocRef = doc(db, 'orders', orderNumber);
+  const orderDocRef = getDocRef('orders', orderNumber);
   const orderDoc = await getDoc(orderDocRef);
   if (!orderDoc.exists()) throw new Error('Order not found');
   
@@ -533,12 +552,12 @@ export async function addPaymentToOrder(orderNumber: string, amount: number, met
     recordedBy: username,
     notes
   };
-  await setDoc(doc(db, 'payments', paymentId), ledger);
+  await setDoc(getDocRef('payments', paymentId), ledger);
 
   // Update Customer Outstanding Due
   const customer = await lookupCustomerByMobile(order.customer.mobile);
   if (customer) {
-    await updateDoc(doc(db, 'customers', customer.id), {
+    await updateDoc(getDocRef('customers', customer.id), {
       remainingDue: Math.max(0, customer.remainingDue - amount)
     });
   }
@@ -558,7 +577,7 @@ export async function refundOrder(orderNumber: string, amount: number, notes: st
   const user = auth?.currentUser;
   const username = user?.displayName || user?.email?.split('@')[0] || 'Admin';
 
-  const orderDocRef = doc(db, 'orders', orderNumber);
+  const orderDocRef = getDocRef('orders', orderNumber);
   const orderDoc = await getDoc(orderDocRef);
   if (!orderDoc.exists()) throw new Error('Order not found');
   
@@ -592,11 +611,11 @@ export async function refundOrder(orderNumber: string, amount: number, notes: st
     recordedBy: username,
     notes
   };
-  await setDoc(doc(db, 'payments', paymentId), ledger);
+  await setDoc(getDocRef('payments', paymentId), ledger);
 
   // Restore Stock on Order Refund/Cancellation
   for (const item of order.products) {
-    const pRef = doc(db, 'products', item.productId);
+    const pRef = getDocRef('products', item.productId);
     const pSnap = await getDoc(pRef);
     if (pSnap.exists()) {
       const pData = pSnap.data() as Product;
@@ -613,7 +632,7 @@ export async function refundOrder(orderNumber: string, amount: number, notes: st
 export async function cancelOrder(orderNumber: string, reason: string): Promise<void> {
   if (!db) throw new Error('Database not configured');
 
-  const orderDocRef = doc(db, 'orders', orderNumber);
+  const orderDocRef = getDocRef('orders', orderNumber);
   const orderDoc = await getDoc(orderDocRef);
   if (!orderDoc.exists()) throw new Error('Order not found');
   
@@ -630,7 +649,7 @@ export async function cancelOrder(orderNumber: string, reason: string): Promise<
 
   // Restore stock
   for (const item of order.products) {
-    const pRef = doc(db, 'products', item.productId);
+    const pRef = getDocRef('products', item.productId);
     const pSnap = await getDoc(pRef);
     if (pSnap.exists()) {
       const pData = pSnap.data() as Product;
@@ -643,7 +662,7 @@ export async function cancelOrder(orderNumber: string, reason: string): Promise<
   // Update Customer remaining due (since order is cancelled, customer outstanding for this order is wiped)
   const customer = await lookupCustomerByMobile(order.customer.mobile);
   if (customer) {
-    await updateDoc(doc(db, 'customers', customer.id), {
+    await updateDoc(getDocRef('customers', customer.id), {
       remainingDue: Math.max(0, customer.remainingDue - order.payment.remaining)
     });
   }
@@ -663,7 +682,7 @@ export async function confirmDelivery(orderNumber: string, deviceDetails: string
   const user = auth?.currentUser;
   const username = user?.displayName || user?.email?.split('@')[0] || 'Staff';
 
-  const orderDocRef = doc(db, 'orders', orderNumber);
+  const orderDocRef = getDocRef('orders', orderNumber);
   const orderDoc = await getDoc(orderDocRef);
   if (!orderDoc.exists()) throw new Error('Order not found');
 
@@ -699,7 +718,7 @@ export function subscribePayments(callback: (payments: PaymentHistory[]) => void
   const ownerId = getCurrentOwnerId();
   if (!db || !ownerId) return () => {};
   const q = query(
-    collection(db, 'payments'),
+    getColRef('payments'),
     where('ownerId', '==', ownerId),
     orderBy('timestamp', 'desc'),
     limit(200)
@@ -727,14 +746,14 @@ export async function createNotification(
     createdAt: new Date().toISOString(),
     metadata
   };
-  await addDoc(collection(db, 'notifications'), notification);
+  await addDoc(getColRef('notifications'), notification);
 }
 
 export function subscribeNotifications(callback: (notifications: Notification[]) => void) {
   const ownerId = getCurrentOwnerId();
   if (!db || !ownerId) return () => {};
   const q = query(
-    collection(db, 'notifications'),
+    getColRef('notifications'),
     where('ownerId', '==', ownerId),
     orderBy('createdAt', 'desc'),
     limit(50)
@@ -746,14 +765,14 @@ export function subscribeNotifications(callback: (notifications: Notification[])
 
 export async function markNotificationAsRead(id: string): Promise<void> {
   if (!db) return;
-  await updateDoc(doc(db, 'notifications', id), { read: true });
+  await updateDoc(getDocRef('notifications', id), { read: true });
 }
 
 export async function markAllNotificationsAsRead(): Promise<void> {
   const ownerId = getCurrentOwnerId();
   if (!db || !ownerId) return;
   const snapshot = await getDocs(query(
-    collection(db, 'notifications'),
+    getColRef('notifications'),
     where('ownerId', '==', ownerId),
     where('read', '==', false)
   ));
@@ -868,7 +887,7 @@ export function subscribeActivityLogs(callback: (logs: ActivityLog[]) => void) {
   const ownerId = getCurrentOwnerId();
   if (!db || !ownerId) return () => {};
   const q = query(
-    collection(db, 'activity_logs'),
+    getColRef('activity_logs'),
     where('ownerId', '==', ownerId),
     orderBy('timestamp', 'desc'),
     limit(150)
@@ -888,31 +907,31 @@ export async function resetDatabaseForFreshStart(): Promise<void> {
 
   try {
     // Delete all orders for the current user
-    const ordersSnap = await getDocs(query(collection(db, 'orders'), where('ownerId', '==', ownerId)));
+    const ordersSnap = await getDocs(query(getColRef('orders'), where('ownerId', '==', ownerId)));
     for (const doc of ordersSnap.docs) {
       await deleteDoc(doc.ref);
     }
 
     // Delete all payments/ledger entries for the current user
-    const paymentsSnap = await getDocs(query(collection(db, 'payments'), where('ownerId', '==', ownerId)));
+    const paymentsSnap = await getDocs(query(getColRef('payments'), where('ownerId', '==', ownerId)));
     for (const doc of paymentsSnap.docs) {
       await deleteDoc(doc.ref);
     }
 
     // Delete all activity logs for the current user
-    const logsSnap = await getDocs(query(collection(db, 'activity_logs'), where('ownerId', '==', ownerId)));
+    const logsSnap = await getDocs(query(getColRef('activity_logs'), where('ownerId', '==', ownerId)));
     for (const doc of logsSnap.docs) {
       await deleteDoc(doc.ref);
     }
 
     // Delete all inventory history for the current user
-    const inventorySnap = await getDocs(query(collection(db, 'inventory_history'), where('ownerId', '==', ownerId)));
+    const inventorySnap = await getDocs(query(getColRef('inventory_history'), where('ownerId', '==', ownerId)));
     for (const doc of inventorySnap.docs) {
       await deleteDoc(doc.ref);
     }
 
     // Reset all customers for current user (clear order counts and totals)
-    const customersSnap = await getDocs(query(collection(db, 'customers'), where('ownerId', '==', ownerId)));
+    const customersSnap = await getDocs(query(getColRef('customers'), where('ownerId', '==', ownerId)));
     for (const customerDoc of customersSnap.docs) {
       await updateDoc(customerDoc.ref, {
         totalOrders: 0,
@@ -924,7 +943,7 @@ export async function resetDatabaseForFreshStart(): Promise<void> {
     }
 
     // Log this action to a new log entry (after clearing)
-    await addDoc(collection(db, 'activity_logs'), {
+    await addDoc(getColRef('activity_logs'), {
       ownerId,
       action: 'Database Reset',
       details: 'Performed fresh start - cleared orders, payments, logs, inventory history, and reset customer totals',

@@ -4,7 +4,9 @@ import {
   getBusinessSettings, 
   updateBusinessSettings, 
   logActivity,
-  resetDatabaseForFreshStart
+  resetDatabaseForFreshStart,
+  getColRef,
+  getDocRef
 } from '../firebase/db';
 import { db } from '../firebase/config';
 import { 
@@ -288,7 +290,7 @@ export const Settings: React.FC = () => {
       const backupData: Record<string, any[]> = {};
 
       for (const colName of collectionsToBackup) {
-        const snapshot = await getDocs(collection(db, colName));
+        const snapshot = await getDocs(getColRef(colName));
         backupData[colName] = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       }
 
@@ -355,7 +357,7 @@ export const Settings: React.FC = () => {
           const docsArray = data[colName];
           for (const docData of docsArray) {
             const { id, ...fields } = docData;
-            const docRef = doc(db, colName, id);
+            const docRef = getDocRef(colName, id);
             batch.set(docRef, fields);
             writeCount++;
           }
