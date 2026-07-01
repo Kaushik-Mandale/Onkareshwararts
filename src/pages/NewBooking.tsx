@@ -77,6 +77,7 @@ export const NewBooking: React.FC = () => {
 
   // STEP 4: Review / Result States
   const [orderId, setOrderId] = useState('');
+  const [qrTokenData, setQrTokenData] = useState('');
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [submittingOrder, setSubmittingOrder] = useState(false);
 
@@ -214,6 +215,7 @@ export const NewBooking: React.FC = () => {
 
     // Cryptographic signed QR token
     const qrToken = generateSecureQRToken(generatedOrderNo);
+    setQrTokenData(qrToken);
 
     // Generate QR Image base64
     try {
@@ -401,7 +403,9 @@ export const NewBooking: React.FC = () => {
 
   // --- WHATSAPP SHARING ---
   const handleShareWhatsApp = () => {
-    const textMsg = `*Ganpati Idol Booking Confirmed!* 
+    const confirmationToken = qrTokenData || generateSecureQRToken(orderId);
+    const confirmationLink = `${window.location.origin}/delivery?token=${encodeURIComponent(confirmationToken)}`;
+    const textMsg = `*Onkareshwararts Booking Confirmed!* 
 -------------------------------
 *Shop:* ${businessSettings?.businessName || 'Onkareshwararts'}
 *Order Number:* ${orderId}
@@ -412,8 +416,9 @@ export const NewBooking: React.FC = () => {
 *Paid Deposit:* ₹${paidAmount.toLocaleString()}
 *Remaining Balance:* ₹${remainingBalance.toLocaleString()}
 *Payment Status:* ${paymentStatus}
+*Pickup Confirmation Link:* ${confirmationLink}
 -------------------------------
-_Show this message QR Code at the shop to confirm delivery._`;
+_Open this link at the shop to verify payment and confirm pickup._`;
 
     const encodedText = encodeURIComponent(textMsg);
     const waUrl = `https://wa.me/?text=${encodedText}`;
@@ -919,6 +924,9 @@ _Show this message QR Code at the shop to confirm delivery._`;
               setPaymentMethod('UPI');
               setCashSplit(0);
               setOnlineSplit(0);
+              setQrTokenData('');
+              setQrCodeDataUrl('');
+              setOrderId('');
               setStep(1);
             }}
             className="w-full py-2.5 bg-saffron hover:bg-saffron-light text-white font-bold rounded-xl text-xs cursor-pointer shadow-md shadow-saffron/10"

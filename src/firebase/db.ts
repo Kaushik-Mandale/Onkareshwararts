@@ -658,7 +658,47 @@ export async function getBusinessSettings(): Promise<BusinessSettings> {
   try {
     const snap = await getDoc(doc(db, 'settings', SETTINGS_DOC_ID));
     if (snap.exists()) {
-      return snap.data() as BusinessSettings;
+      const stored = snap.data() as BusinessSettings;
+      const migrated: BusinessSettings = {
+        ...defaultSettings,
+        ...stored,
+        bankDetails: {
+          ...defaultSettings.bankDetails,
+          ...stored.bankDetails
+        },
+        invoiceSettings: {
+          ...defaultSettings.invoiceSettings,
+          ...stored.invoiceSettings
+        }
+      };
+
+      let changed = false;
+      if (migrated.businessName === 'Ganpati Idol Emporium') {
+        migrated.businessName = defaultSettings.businessName;
+        changed = true;
+      }
+      if (migrated.bankDetails.accountName === 'Ganpati Idol Emporium') {
+        migrated.bankDetails.accountName = defaultSettings.bankDetails.accountName;
+        changed = true;
+      }
+      if (migrated.phone === '+91 9876543210') {
+        migrated.phone = defaultSettings.phone;
+        changed = true;
+      }
+      if (migrated.whatsapp === '+91 9876543210') {
+        migrated.whatsapp = defaultSettings.whatsapp;
+        changed = true;
+      }
+      if (migrated.address === 'Shop No. 10, Ganesh Chowk, Pune, Maharashtra') {
+        migrated.address = defaultSettings.address;
+        changed = true;
+      }
+
+      if (changed) {
+        await setDoc(doc(db, 'settings', SETTINGS_DOC_ID), migrated, { merge: true });
+      }
+
+      return migrated;
     }
     // Write defaults if not exist
     await setDoc(doc(db, 'settings', SETTINGS_DOC_ID), defaultSettings);

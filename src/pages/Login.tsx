@@ -1,5 +1,5 @@
 ﻿import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ShieldCheck, AlertCircle, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 export const Login: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -28,7 +29,8 @@ export const Login: React.FC = () => {
     try {
       await login(username, password);
       toast.success('Welcome back! Logged in successfully.');
-      navigate('/');
+      const redirect = new URLSearchParams(location.search).get('redirect') || '/';
+      navigate(redirect, { replace: true });
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Login failed. Please verify credentials.');

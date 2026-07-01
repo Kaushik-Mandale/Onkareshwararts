@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { getOrder, confirmDelivery } from '../firebase/db';
 import type { Order } from '../types';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -59,12 +59,45 @@ export const DeliveryScanner: React.FC = () => {
   const qrScannerRef = useRef<Html5Qrcode | null>(null);
   const readerId = "qr-reader-viewport";
 
+  const processScannedToken = useCallback(async (decodedText: string, sourceLabel = 'QR Code') => {
+    toast.info(`${sourceLabel} detected. Fetching booking details...`);
+
+    const validation = validateQRToken(decodedText);
+    if (!validation.isValid) {
+      setScanError('Invalid QR Token. The signature does not match our security database keys.');
+      toast.error('Verification failed: Invalid QR Signature.');
+      return;
+    }
+
+    try {
+      const order = await getOrder(validation.orderId);
+      if (order) {
+        setScannedOrder(order);
+        setScanError(null);
+        toast.success(`Successfully loaded booking: ${order.orderNumber}`);
+      } else {
+        setScanError(`Order record ${validation.orderId} not found in database.`);
+      }
+    } catch (e: any) {
+      console.error(e);
+      setScanError('Database retrieval failed: ' + e.message);
+    }
+  }, []);
+
   // Stop camera on unmount
   useEffect(() => {
     return () => {
       stopScanner();
     };
   }, []);
+
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get('token');
+    if (!token) return;
+
+    void processScannedToken(token, 'WhatsApp confirmation link');
+    window.history.replaceState({}, '', '/delivery');
+  }, [processScannedToken]);
 
   // --- CAMERA CONTROL ---
   const startScanner = async () => {
@@ -113,29 +146,7 @@ export const DeliveryScanner: React.FC = () => {
   // --- SCAN CALLBACKS ---
   const onScanSuccess = async (decodedText: string) => {
     await stopScanner();
-    toast.info('QR Code detected. Fetching signature details...');
-
-    // 1. Verify QR token cryptographically
-    const validation = validateQRToken(decodedText);
-    if (!validation.isValid) {
-      setScanError('Invalid QR Token. The signature does not match our security database keys.');
-      toast.error('Verification failed: Invalid QR Signature.');
-      return;
-    }
-
-    // 2. Fetch Order from Firestore
-    try {
-      const order = await getOrder(validation.orderId);
-      if (order) {
-        setScannedOrder(order);
-        toast.success(`Successfully loaded booking: ${order.orderNumber}`);
-      } else {
-        setScanError(`Order record ${validation.orderId} not found in database.`);
-      }
-    } catch (e: any) {
-      console.error(e);
-      setScanError('Database retrieval failed: ' + e.message);
-    }
+    await processScannedToken(decodedText);
   };
 
   const onScanFailure = (_error: unknown) => {
@@ -209,7 +220,7 @@ export const DeliveryScanner: React.FC = () => {
             </div>
             <div className="space-y-1.5">
               <h3 className="font-bold text-foreground text-sm">Ready to Scan QR</h3>
-              <p className="text-xs text-muted-foreground max-w-xs mx-auto">Open the camera viewport and align the customer's PDF or WhatsApp QR code within the frame.</p>
+              <p className="text-xs text-muted-foreground max-w-xs mx-auto">Scan the invoice QR code, or open the pickup confirmation link shared on WhatsApp.</p>
             </div>
             <button
               onClick={startScanner}

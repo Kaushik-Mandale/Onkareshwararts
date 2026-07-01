@@ -38,7 +38,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   // Redirect to login if not logged in
   if (!currentUser) {
-    return <Navigate to="/login" replace />;
+    const redirectTarget = `${window.location.pathname}${window.location.search}`;
+    return <Navigate to={`/login?redirect=${encodeURIComponent(redirectTarget)}`} replace />;
   }
 
   // Check role restriction

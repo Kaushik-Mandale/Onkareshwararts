@@ -270,7 +270,8 @@ export const Orders: React.FC = () => {
   };
 
   const handleShareWhatsApp = (order: Order) => {
-    const textMsg = `*Update on your Ganpati Idol Booking:* 
+    const confirmationLink = `${window.location.origin}/delivery?token=${encodeURIComponent(order.qrToken)}`;
+    const textMsg = `*Update on your Onkareshwararts Booking:* 
 -------------------------------
 *Shop:* ${businessSettings?.businessName || 'Onkareshwararts'}
 *Order Number:* ${order.orderNumber}
@@ -281,8 +282,9 @@ export const Orders: React.FC = () => {
 *Paid Deposit:* ₹${order.payment.paid.toLocaleString()}
 *Remaining Balance:* ₹${order.payment.remaining.toLocaleString()}
 *Payment Status:* ${order.payment.status}
+*Pickup Confirmation Link:* ${confirmationLink}
 -------------------------------
-_Keep this confirmation. Show your order ID or scan QR when collecting._`;
+_Open this link at the shop to verify payment and confirm pickup._`;
 
     const waUrl = `https://wa.me/?text=${encodeURIComponent(textMsg)}`;
     window.open(waUrl, '_blank');
