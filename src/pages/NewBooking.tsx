@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { 
   subscribeProducts, 
   lookupCustomerByMobile, 
@@ -295,8 +295,8 @@ export const NewBooking: React.FC = () => {
     doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
     doc.setFont('Helvetica', 'normal');
-    doc.text(businessSettings?.address || 'Shop No. 10, Ganesh Chowk, Pune', 15, 28);
-    doc.text(`Phone: ${businessSettings?.phone || '+91 9876543210'} | UPI: ${businessSettings?.upiId || ''}`, 15, 33);
+    doc.text(businessSettings?.address || 'Ayodhya Nagari, Plot No. 50, Sakri Road, Dhule, Behind Circuit House', 15, 28);
+    doc.text(`Phone: ${businessSettings?.phone || '+91 9168925461'} | UPI: ${businessSettings?.upiId || ''}`, 15, 33);
 
     // Invoice Title
     doc.setTextColor(20, 20, 20);
@@ -416,7 +416,7 @@ export const NewBooking: React.FC = () => {
 _Show this message QR Code at the shop to confirm delivery._`;
 
     const encodedText = encodeURIComponent(textMsg);
-    const waUrl = `https://api.whatsapp.com/send?phone=+91${custMobile}&text=${encodedText}`;
+    const waUrl = `https://wa.me/?text=${encodedText}`;
     window.open(waUrl, '_blank');
   };
 

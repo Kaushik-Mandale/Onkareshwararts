@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { getOrder, confirmDelivery } from '../firebase/db';
 import type { Order } from '../types';
 import { Html5Qrcode } from 'html5-qrcode';

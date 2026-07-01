@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getProducts, getCustomers, subscribeOrders } from '../firebase/db';
 import type { Product, Customer, Order } from '../types';

@@ -1,4 +1,4 @@
-import { 
+﻿import { 
   collection, 
   doc, 
   setDoc, 
@@ -633,9 +633,9 @@ export async function getBusinessSettings(): Promise<BusinessSettings> {
   const defaultSettings: BusinessSettings = {
     businessName: 'Onkareshwararts',
     ownerName: 'Admin Owner',
-    phone: '+91 9876543210',
-    whatsapp: '+91 9876543210',
-    address: 'Shop No. 10, Ganesh Chowk, Pune, Maharashtra',
+    phone: '+91 9168925461',
+    whatsapp: '+91 9168925461',
+    address: 'Ayodhya Nagari, Plot No. 50, Sakri Road, Dhule, Behind Circuit House',
     upiId: 'ganpatiIdol@upi',
     bankDetails: {
       accountName: 'Onkareshwararts',
