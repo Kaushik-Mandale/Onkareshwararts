@@ -768,10 +768,22 @@ export async function resetDatabaseForFreshStart(): Promise<void> {
       await deleteDoc(doc.ref);
     }
 
+    // Reset all customers (clear order counts and totals)
+    const customersSnap = await getDocs(collection(db, 'customers'));
+    for (const customerDoc of customersSnap.docs) {
+      await updateDoc(customerDoc.ref, {
+        totalOrders: 0,
+        totalSpent: 0,
+        totalDue: 0,
+        tags: [],
+        lastOrderDate: null
+      });
+    }
+
     // Log this action to a new log entry (after clearing)
     await addDoc(collection(db, 'activity_logs'), {
       action: 'Database Reset',
-      details: 'Performed fresh start - cleared orders, payments, logs, and inventory history',
+      details: 'Performed fresh start - cleared orders, payments, logs, inventory history, and reset customer totals',
       timestamp: new Date().toISOString(),
       userId: auth?.currentUser?.uid || 'system',
       userEmail: auth?.currentUser?.email || 'system'

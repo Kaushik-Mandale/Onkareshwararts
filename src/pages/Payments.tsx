@@ -1,4 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
+import { db } from '../firebase/config';
+import { doc, deleteDoc } from 'firebase/firestore';
 import { 
   subscribePayments, 
   subscribeOrders 
@@ -11,8 +13,10 @@ import {
   Calendar, 
   ArrowUpRight, 
   ArrowDownLeft, 
-  PiggyBank
+  PiggyBank,
+  Trash2
 } from 'lucide-react';
+import { toast } from 'sonner';
 import dayjs from 'dayjs';
 
 export const Payments: React.FC = () => {
@@ -32,6 +36,20 @@ export const Payments: React.FC = () => {
   }, []);
 
   const todayStr = dayjs().format('YYYY-MM-DD');
+
+  // --- DELETE PAYMENT RECORD ---
+  const handleDeletePayment = async (paymentId: string, orderId: string) => {
+    if (window.confirm(`Are you sure you want to delete payment record ${paymentId} for order ${orderId}? This action cannot be undone.`)) {
+      try {
+        if (!db) throw new Error('Database not configured');
+        await deleteDoc(doc(db, 'payments', paymentId));
+        toast.success('Payment record deleted successfully.');
+      } catch (error: any) {
+        toast.error('Failed to delete payment: ' + error.message);
+        console.error('Delete payment error:', error);
+      }
+    }
+  };
 
   // --- STATS COMPUTATIONS ---
   const todayCollections = payments
@@ -226,6 +244,13 @@ export const Payments: React.FC = () => {
                       {pay.type === 'refund' ? `-₹${pay.amount.toLocaleString()}` : `+₹${pay.amount.toLocaleString()}`}
                     </strong>
                   </div>
+                  <button
+                    onClick={() => handleDeletePayment(pay.id, pay.orderId)}
+                    className="text-red-500 hover:text-red-600 hover:bg-red-500/10 p-2 rounded-lg transition-all shrink-0"
+                    title="Delete Payment Record"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             ))

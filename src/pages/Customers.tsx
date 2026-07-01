@@ -5,7 +5,7 @@ import {
   subscribeOrders 
 } from '../firebase/db';
 import type { Customer, Order } from '../types';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { 
   Search, 
@@ -17,7 +17,8 @@ import {
   Tag, 
   ChevronDown, 
   ChevronUp, 
-  AlertCircle
+  AlertCircle,
+  Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
@@ -80,6 +81,19 @@ export const Customers: React.FC = () => {
       toast.success('Tags updated successfully.');
     } catch (e: any) {
       toast.error('Failed to update tags: ' + e.message);
+    }
+  };
+
+  const handleDeleteCustomer = async (customerId: string, customerName: string) => {
+    if (window.confirm(`⚠️ WARNING: Delete customer "${customerName}" and all their booking history?\n\nThis action cannot be undone.`)) {
+      try {
+        if (!db) throw new Error('Database not configured');
+        await deleteDoc(doc(db, 'customers', customerId));
+        toast.success('Customer deleted successfully.');
+      } catch (error: any) {
+        toast.error('Failed to delete customer: ' + error.message);
+        console.error('Delete customer error:', error);
+      }
     }
   };
 
@@ -202,8 +216,20 @@ export const Customers: React.FC = () => {
                         ₹{customer.remainingDue.toLocaleString()}
                       </span>
                     </div>
-                    <div className="text-muted-foreground">
-                      {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCustomer(customer.id, customer.name);
+                        }}
+                        className="text-red-500 hover:text-red-600 hover:bg-red-500/10 p-2 rounded-lg transition-all"
+                        title="Delete Customer"
+                      >
+                        <Trash2 className="h-4.5 w-4.5" />
+                      </button>
+                      <div className="text-muted-foreground">
+                        {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                      </div>
                     </div>
                   </div>
                 </div>
