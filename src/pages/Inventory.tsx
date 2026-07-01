@@ -8,8 +8,6 @@ import {
   deleteProductSoft,
   subscribeProducts
 } from '../firebase/db';
-import { storage } from '../firebase/config';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Product } from '../types';
 import { 
   Search, 
@@ -42,6 +40,47 @@ const CODE39_PATTERNS = [
   "011010000", "010000101", "110000100", "011000100", "010101000", // Z, -, ., ' ', $
   "010100010", "010001010", "000101010", "010010100"              // /, +, %, *
 ];
+
+const compressImageFile = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith('image/')) {
+      reject(new Error('Please choose a valid image file.'));
+      return;
+    }
+
+    const imageUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      URL.revokeObjectURL(imageUrl);
+
+      const maxSide = 900;
+      const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
+      const width = Math.max(1, Math.round(image.width * scale));
+      const height = Math.max(1, Math.round(image.height * scale));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Image processor is not available in this browser.'));
+        return;
+      }
+
+      ctx.drawImage(image, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.78));
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(imageUrl);
+      reject(new Error('Could not read this image. Try a JPG, PNG, or WebP file.'));
+    };
+
+    image.src = imageUrl;
+  });
+};
 
 const Barcode: React.FC<{ value: string }> = ({ value }) => {
   const encodeText = `*${value.toUpperCase()}*`;
@@ -179,23 +218,23 @@ export const Inventory: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!storage) {
-      toast.error('Firebase Storage is not configured. Please paste a Photo URL instead.');
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error('Image is too large. Please choose a file under 8 MB.');
+      e.target.value = '';
       return;
     }
 
     setUploadingImage(true);
     try {
-      const storageRef = ref(storage, `product-images/${id}-${Date.now()}-${file.name}`);
-      const snapshot = await uploadBytes(storageRef, file);
-      const downloadUrl = await getDownloadURL(snapshot.ref);
-      setPhotoUrl(downloadUrl);
-      toast.success('Product image uploaded successfully!');
+      const compressedDataUrl = await compressImageFile(file);
+      setPhotoUrl(compressedDataUrl);
+      toast.success('Product image added.');
     } catch (err: any) {
       console.error(err);
-      toast.error('Upload failed: ' + err.message);
+      toast.error('Image failed: ' + err.message);
     } finally {
       setUploadingImage(false);
+      e.target.value = '';
     }
   };
 
@@ -816,7 +855,7 @@ export const Inventory: React.FC = () => {
                       className="flex items-center justify-center space-x-1.5 w-full py-2 border border-dashed border-border hover:bg-muted/50 text-xs font-semibold rounded-xl transition-all cursor-pointer"
                     >
                       <UploadCloud className="h-4.5 w-4.5 text-saffron" />
-                      <span>{uploadingImage ? 'Uploading...' : 'Upload Image File'}</span>
+                      <span>{uploadingImage ? 'Processing...' : 'Choose Image File'}</span>
                     </button>
                     {uploadingImage && (
                       <div className="w-full bg-border h-1 rounded-full overflow-hidden">
