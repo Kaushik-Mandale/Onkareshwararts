@@ -102,6 +102,21 @@ npm run build
 
 The production output is generated in `dist/`.
 
+## Deploying To Vercel
+
+When deploying on Vercel, add these environment variables in **Project Settings > Environment Variables**:
+
+```env
+VITE_FIREBASE_API_KEY=your_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+```
+
+After saving the variables, redeploy the project from Vercel. The included `vercel.json` sends all routes back to `index.html`, which keeps React Router pages working after refresh.
+
 ## Project Structure
 
 ```text
