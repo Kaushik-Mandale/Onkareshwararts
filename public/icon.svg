@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Rich gradients for premium SaaS feel -->
+    <linearGradient id="saffronGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF9933" />
+      <stop offset="50%" stop-color="#E05A17" />
+      <stop offset="100%" stop-color="#A83600" />
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#9A7B1C" />
+      <stop offset="50%" stop-color="#D4AF37" />
+      <stop offset="100%" stop-color="#F3E5AB" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#E05A17" flood-opacity="0.3" />
+    </filter>
+  </defs>
+
+  <!-- Background Base -->
+  <rect width="512" height="512" rx="128" fill="url(#saffronGrad)" />
+  
+  <!-- Outer Gold Ring -->
+  <circle cx="256" cy="256" r="210" fill="none" stroke="url(#goldGrad)" stroke-width="10" stroke-dasharray="15 8" opacity="0.6" />
+  <circle cx="256" cy="256" r="190" fill="none" stroke="url(#goldGrad)" stroke-width="2" opacity="0.8" />
+
+  <!-- Stylized Ganesha Icon (Minimalist / SaaS Style) -->
+  <g filter="url(#glow)">
+    <!-- Ears -->
+    <path d="M150 180 C110 180 100 240 130 270 C160 300 200 290 200 250 Z" fill="url(#goldGrad)" opacity="0.9" />
+    <path d="M362 180 C402 180 412 240 382 270 C352 300 312 290 312 250 Z" fill="url(#goldGrad)" opacity="0.9" />
+    
+    <!-- Head / Crown (Mukut) -->
+    <path d="M220 150 L256 60 L292 150 L256 170 Z" fill="url(#goldGrad)" />
+    <circle cx="256" cy="50" r="8" fill="#F3E5AB" />
+    <path d="M236 120 L256 80 L276 120 Z" fill="#FFFFFF" opacity="0.5" />
+
+    <!-- Face / Trunk -->
+    <path d="M210 180 C210 150 302 150 302 180 C302 210 266 220 266 250 C266 290 300 290 300 320 C300 350 240 370 220 320 C210 290 246 290 246 250 C246 220 210 210 210 180 Z" fill="url(#goldGrad)" />
+    
+    <!-- Tusk -->
+    <path d="M200 240 L220 245 L215 255 Z" fill="#FFFFFF" />
+    
+    <!-- Modak / Sweets on trunk side -->
+    <path d="M305 310 C315 310 320 320 315 328 C310 332 300 332 295 328 C290 320 295 310 305 310 Z" fill="url(#goldGrad)" />
+
+    <!-- Tilak (Auspicious forehead mark) -->
+    <line x1="256" y1="135" x2="256" y2="155" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" />
+    <line x1="246" y1="145" x2="266" y2="145" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" />
+    <circle cx="256" cy="128" r="4" fill="#A83600" />
+  </g>
+</svg>
