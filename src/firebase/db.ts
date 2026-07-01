@@ -773,10 +773,10 @@ export async function resetDatabaseForFreshStart(): Promise<void> {
     for (const customerDoc of customersSnap.docs) {
       await updateDoc(customerDoc.ref, {
         totalOrders: 0,
-        totalSpent: 0,
-        totalDue: 0,
+        totalAmount: 0,
+        remainingDue: 0,
         tags: [],
-        lastOrderDate: null
+        lastVisit: '',
       });
     }
 
