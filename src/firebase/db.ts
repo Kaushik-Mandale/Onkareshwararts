@@ -33,7 +33,18 @@ function getCurrentOwnerId(): string {
   return ownerId;
 }
 
+// Module-level shop owner path — shared by all users in the same shop.
+// Set by AuthContext after login so that admin and staff use the same Firestore sub-path.
+let _shopOwnerPath: string | null = null;
+
+export function setShopOwnerPath(path: string) {
+  _shopOwnerPath = path;
+}
+
 function getUsernamePath(): string {
+  // Use the shared shop owner path if set (ensures admin + staff share data)
+  if (_shopOwnerPath) return _shopOwnerPath;
+  // Fallback: derive from the current user's email prefix
   const email = auth?.currentUser?.email;
   if (!email) {
     const uid = auth?.currentUser?.uid;
@@ -59,6 +70,9 @@ function getSettingsDocRef() {
 }
 
 function assertResourceOwnedByCurrentUser(resourceOwnerId?: string) {
+  // In a multi-user shop, any authenticated user in the shop can access all shop resources.
+  // We only enforce ownership checks if no shopOwnerPath is set (legacy isolation mode).
+  if (_shopOwnerPath) return; // All users share the shop — access is permitted
   const ownerId = getCurrentOwnerId();
   if (!ownerId || resourceOwnerId !== ownerId) {
     throw new Error('Resource not found or access denied.');
@@ -71,6 +85,8 @@ function dayTime(value?: string): number {
 
 async function assertDocumentOwnedByCurrentUser(ref: DocumentReference, resourceName: string): Promise<void> {
   if (!db) throw new Error('Database not configured');
+  // In a multi-user shop, any authenticated user in the shop can access all shop resources.
+  if (_shopOwnerPath) return; // All users share the shop — access is permitted
   const ownerId = getCurrentOwnerId();
 
   const snapshot = await getDoc(ref);
@@ -107,23 +123,19 @@ export async function logActivity(action: string, details: string) {
 // PRODUCTS CRUD
 // ==========================================
 export async function getProducts(): Promise<Product[]> {
-  const ownerId = getCurrentOwnerId();
-  if (!db || !ownerId) return [];
+  if (!db) return [];
   const snapshot = await getDocs(query(
     getColRef('products'),
-    where('status', '!=', 'deleted'),
-    where('ownerId', '==', ownerId)
+    where('status', '!=', 'deleted')
   ));
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
 }
 
 export function subscribeProducts(callback: (products: Product[]) => void) {
-  const ownerId = getCurrentOwnerId();
-  if (!db || !ownerId) return () => {};
+  if (!db) return () => {};
   const q = query(
     getColRef('products'),
-    where('status', '!=', 'deleted'),
-    where('ownerId', '==', ownerId)
+    where('status', '!=', 'deleted')
   );
   return onSnapshot(q, (snapshot) => {
     const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
@@ -251,11 +263,9 @@ async function logStockChange(productId: string, productName: string, previousSt
 }
 
 export function subscribeInventoryHistory(callback: (history: InventoryHistory[]) => void) {
-  const ownerId = getCurrentOwnerId();
-  if (!db || !ownerId) return () => {};
+  if (!db) return () => {};
   const q = query(
     getColRef('inventory_history'),
-    where('ownerId', '==', ownerId),
     orderBy('timestamp', 'desc'),
     limit(100)
   );
@@ -268,22 +278,18 @@ export function subscribeInventoryHistory(callback: (history: InventoryHistory[]
 // CUSTOMERS CRM
 // ==========================================
 export async function getCustomers(): Promise<Customer[]> {
-  const ownerId = getCurrentOwnerId();
-  if (!db || !ownerId) return [];
+  if (!db) return [];
   const snapshot = await getDocs(query(
     getColRef('customers'),
-    where('ownerId', '==', ownerId),
     orderBy('name', 'asc')
   ));
   return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Customer));
 }
 
 export function subscribeCustomers(callback: (customers: Customer[]) => void) {
-  const ownerId = getCurrentOwnerId();
-  if (!db || !ownerId) return () => {};
+  if (!db) return () => {};
   const q = query(
     getColRef('customers'),
-    where('ownerId', '==', ownerId),
     orderBy('name', 'asc')
   );
   return onSnapshot(q, (snapshot) => {
@@ -292,11 +298,9 @@ export function subscribeCustomers(callback: (customers: Customer[]) => void) {
 }
 
 export async function lookupCustomerByMobile(mobile: string): Promise<Customer | null> {
-  const ownerId = getCurrentOwnerId();
-  if (!db || !ownerId) return null;
+  if (!db) return null;
   const q = query(
     getColRef('customers'),
-    where('ownerId', '==', ownerId),
     where('mobile', '==', mobile.trim()),
     limit(1)
   );
@@ -718,11 +722,9 @@ export async function confirmDelivery(orderNumber: string, deviceDetails: string
 // PAYMENTS LEDGER QUERYING
 // ==========================================
 export function subscribePayments(callback: (payments: PaymentHistory[]) => void) {
-  const ownerId = getCurrentOwnerId();
-  if (!db || !ownerId) return () => {};
+  if (!db) return () => {};
   const q = query(
     getColRef('payments'),
-    where('ownerId', '==', ownerId),
     orderBy('timestamp', 'desc'),
     limit(200)
   );
@@ -753,11 +755,9 @@ export async function createNotification(
 }
 
 export function subscribeNotifications(callback: (notifications: Notification[]) => void) {
-  const ownerId = getCurrentOwnerId();
-  if (!db || !ownerId) return () => {};
+  if (!db) return () => {};
   const q = query(
     getColRef('notifications'),
-    where('ownerId', '==', ownerId),
     orderBy('createdAt', 'desc'),
     limit(50)
   );
@@ -772,11 +772,9 @@ export async function markNotificationAsRead(id: string): Promise<void> {
 }
 
 export async function markAllNotificationsAsRead(): Promise<void> {
-  const ownerId = getCurrentOwnerId();
-  if (!db || !ownerId) return;
+  if (!db) return;
   const snapshot = await getDocs(query(
     getColRef('notifications'),
-    where('ownerId', '==', ownerId),
     where('read', '==', false)
   ));
   const batchPromises = snapshot.docs.map(doc => updateDoc(doc.ref, { read: true }));
@@ -887,11 +885,9 @@ export function subscribeSettings(callback: (settings: BusinessSettings) => void
 // ACTIVITY LOGS
 // ==========================================
 export function subscribeActivityLogs(callback: (logs: ActivityLog[]) => void) {
-  const ownerId = getCurrentOwnerId();
-  if (!db || !ownerId) return () => {};
+  if (!db) return () => {};
   const q = query(
     getColRef('activity_logs'),
-    where('ownerId', '==', ownerId),
     orderBy('timestamp', 'desc'),
     limit(150)
   );
@@ -906,35 +902,34 @@ export function subscribeActivityLogs(callback: (logs: ActivityLog[]) => void) {
 export async function resetDatabaseForFreshStart(): Promise<void> {
   if (!db) throw new Error('Database not configured');
   const ownerId = getCurrentOwnerId();
-  if (!ownerId) throw new Error('User must be signed in to reset database.');
 
   try {
-    // Delete all orders for the current user
-    const ordersSnap = await getDocs(query(getColRef('orders'), where('ownerId', '==', ownerId)));
+    // Delete all orders for the current shop
+    const ordersSnap = await getDocs(query(getColRef('orders')));
     for (const doc of ordersSnap.docs) {
       await deleteDoc(doc.ref);
     }
 
-    // Delete all payments/ledger entries for the current user
-    const paymentsSnap = await getDocs(query(getColRef('payments'), where('ownerId', '==', ownerId)));
+    // Delete all payments/ledger entries for the current shop
+    const paymentsSnap = await getDocs(query(getColRef('payments')));
     for (const doc of paymentsSnap.docs) {
       await deleteDoc(doc.ref);
     }
 
-    // Delete all activity logs for the current user
-    const logsSnap = await getDocs(query(getColRef('activity_logs'), where('ownerId', '==', ownerId)));
+    // Delete all activity logs for the current shop
+    const logsSnap = await getDocs(query(getColRef('activity_logs')));
     for (const doc of logsSnap.docs) {
       await deleteDoc(doc.ref);
     }
 
-    // Delete all inventory history for the current user
-    const inventorySnap = await getDocs(query(getColRef('inventory_history'), where('ownerId', '==', ownerId)));
+    // Delete all inventory history for the current shop
+    const inventorySnap = await getDocs(query(getColRef('inventory_history')));
     for (const doc of inventorySnap.docs) {
       await deleteDoc(doc.ref);
     }
 
-    // Reset all customers for current user (clear order counts and totals)
-    const customersSnap = await getDocs(query(getColRef('customers'), where('ownerId', '==', ownerId)));
+    // Reset all customers for current shop (clear order counts and totals)
+    const customersSnap = await getDocs(query(getColRef('customers')));
     for (const customerDoc of customersSnap.docs) {
       await updateDoc(customerDoc.ref, {
         totalOrders: 0,
