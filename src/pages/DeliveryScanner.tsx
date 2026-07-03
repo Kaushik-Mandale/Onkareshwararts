@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useEffect, useRef } from 'react';
-import { getOrder, confirmDelivery } from '../firebase/db';
+import { getOrder, confirmDelivery, addPaymentToOrder } from '../firebase/db';
 import type { Order } from '../types';
 import { Html5Qrcode } from 'html5-qrcode';
 import { 
@@ -57,6 +57,8 @@ export const DeliveryScanner: React.FC = () => {
   const [scanError, setScanError] = useState<string | null>(null);
   const [processingDelivery, setProcessingDelivery] = useState(false);
   const [uploadProcessing, setUploadProcessing] = useState(false);
+  const [collectCash, setCollectCash] = useState(0);
+  const [collectUpi, setCollectUpi] = useState(0);
   
   const qrScannerRef = useRef<Html5Qrcode | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -187,10 +189,43 @@ export const DeliveryScanner: React.FC = () => {
     setProcessingDelivery(true);
 
     try {
+      const remaining = scannedOrder.payment.remaining;
+      const totalCollected = collectCash + collectUpi;
+
+      if (remaining > 0) {
+        if (totalCollected !== remaining) {
+          toast.error(`Please collect the exact remaining balance of ₹${remaining.toLocaleString()} (Current: ₹${totalCollected.toLocaleString()}).`);
+          setProcessingDelivery(false);
+          return;
+        }
+
+        // Record the payments
+        if (collectCash > 0) {
+          await addPaymentToOrder(
+            scannedOrder.orderNumber,
+            collectCash,
+            'Cash',
+            'Final delivery payment (Cash)'
+          );
+        }
+        if (collectUpi > 0) {
+          await addPaymentToOrder(
+            scannedOrder.orderNumber,
+            collectUpi,
+            'UPI',
+            'Final delivery payment (UPI)'
+          );
+        }
+      }
+
       const deviceDetails = `${navigator.platform} | ${navigator.userAgent.split(') ')[0].split('(')[1] || 'Web Session'}`;
       await confirmDelivery(scannedOrder.orderNumber, deviceDetails);
-      toast.success('Delivery Confirmed! Database updated.');
+      toast.success('Payment recorded & Delivery Confirmed!');
       
+      // Reset inputs
+      setCollectCash(0);
+      setCollectUpi(0);
+
       // Reload order detail state
       const reloaded = await getOrder(scannedOrder.orderNumber);
       setScannedOrder(reloaded);
@@ -361,13 +396,49 @@ export const DeliveryScanner: React.FC = () => {
                 </div>
               </div>
             ) : scannedOrder.payment.remaining > 0 ? (
-              <div className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-2xl flex items-start space-x-3 text-amber-700 dark:text-amber-400">
-                <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0" />
-                <div className="space-y-1">
-                  <strong className="font-bold">Outstanding Balance Warning!</strong>
-                  <p className="text-[11px] leading-relaxed">
-                    Ensure the remaining balance of <strong className="font-extrabold text-foreground underline">₹{scannedOrder.payment.remaining.toLocaleString()}</strong> is collected via UPI or Cash first before releasing the idols.
-                  </p>
+              <div className="space-y-4">
+                <div className="p-4 bg-amber-500/10 border border-amber-500/25 rounded-2xl flex items-start space-x-3 text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="h-5 w-5 mt-0.5 shrink-0" />
+                  <div className="space-y-1">
+                    <strong className="font-bold">Outstanding Balance Warning!</strong>
+                    <p className="text-[11px] leading-relaxed">
+                      This order has a remaining balance of <strong>₹{scannedOrder.payment.remaining.toLocaleString()}</strong>. Collect the amount below to confirm delivery.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-muted/40 border border-border rounded-xl space-y-3.5 text-left">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase block">Record Delivery Payment Collection</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <span className="block text-[8px] font-bold text-muted-foreground uppercase">Cash Collected (₹)</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={scannedOrder.payment.remaining}
+                        value={collectCash || ''}
+                        onChange={(e) => setCollectCash(parseFloat(e.target.value) || 0)}
+                        className="w-full px-3 py-1.5 border border-border bg-background rounded-lg font-semibold"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="block text-[8px] font-bold text-muted-foreground uppercase">UPI/Online Collected (₹)</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={scannedOrder.payment.remaining}
+                        value={collectUpi || ''}
+                        onChange={(e) => setCollectUpi(parseFloat(e.target.value) || 0)}
+                        className="w-full px-3 py-1.5 border border-border bg-background rounded-lg font-semibold"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center text-[10px] font-semibold pt-1 border-t border-border/40">
+                    <span className="text-muted-foreground">Configured: ₹{collectCash + collectUpi}</span>
+                    <span className={collectCash + collectUpi === scannedOrder.payment.remaining ? 'text-green-600 font-bold' : 'text-red-500 font-bold'}>
+                      Required: ₹{scannedOrder.payment.remaining}
+                    </span>
+                  </div>
                 </div>
               </div>
             ) : (
