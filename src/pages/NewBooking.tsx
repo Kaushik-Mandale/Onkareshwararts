@@ -80,7 +80,6 @@ export const NewBooking: React.FC = () => {
 
   // STEP 4: Review / Result States
   const [orderId, setOrderId] = useState('');
-  const [qrTokenData, setQrTokenData] = useState('');
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [submittingOrder, setSubmittingOrder] = useState(false);
 
@@ -219,7 +218,6 @@ export const NewBooking: React.FC = () => {
 
     // Cryptographic signed QR token
     const qrToken = generateSecureQRToken(generatedOrderNo);
-    setQrTokenData(qrToken);
 
     // Generate QR Image base64
     try {
@@ -420,8 +418,6 @@ export const NewBooking: React.FC = () => {
 
   // --- WHATSAPP SHARING ---
   const handleShareWhatsApp = () => {
-    const confirmationToken = qrTokenData || generateSecureQRToken(orderId);
-    const confirmationLink = `${window.location.origin}/delivery?token=${encodeURIComponent(confirmationToken)}`;
     const textMsg = `*Onkareshwararts Booking Confirmed!* 
 -------------------------------
 *Shop:* ${businessSettings?.businessName || 'Onkareshwararts'}
@@ -433,9 +429,8 @@ export const NewBooking: React.FC = () => {
 *Paid Deposit:* ₹${paidAmount.toLocaleString()}
 *Remaining Balance:* ₹${remainingBalance.toLocaleString()}
 *Payment Status:* ${paymentStatus}
-*Pickup Confirmation Link:* ${confirmationLink}
 -------------------------------
-_Open this link at the shop to verify payment and confirm pickup._`;
+_Open the invoice at the shop to verify payment and confirm pickup from the QR code inside it._`;
 
     const encodedText = encodeURIComponent(textMsg);
     const waUrl = `https://wa.me/?text=${encodedText}`;
@@ -881,7 +876,6 @@ _Open this link at the shop to verify payment and confirm pickup._`;
               setCustNotes('');
               setCashSplit(0);
               setOnlineSplit(0);
-              setQrTokenData('');
               setQrCodeDataUrl('');
               setOrderId('');
               setStep(1);
