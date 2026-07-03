@@ -68,7 +68,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     { name: 'Inventory CRM', path: '/inventory', icon: Package, roles: ['admin', 'staff'] },
     { name: 'Customer CRM', path: '/customers', icon: Users, roles: ['admin', 'staff'] },
     { name: 'Reports & Analytics', path: '/reports', icon: BarChart3, roles: ['admin', 'staff'] },
-    { name: 'Settings & Admin', path: '/settings', icon: Settings, roles: ['admin'] },
+    { name: 'Settings & Admin', path: '/settings', icon: Settings, roles: ['admin', 'staff'] },
   ];
 
   const handleLogout = async () => {
