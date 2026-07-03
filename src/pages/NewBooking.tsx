@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   subscribeProducts, 
   lookupCustomerByMobile, 
@@ -69,12 +69,12 @@ export const NewBooking: React.FC = () => {
   // STEP 3: Payment States
   const [discount, setDiscount] = useState(0);
   const [gstEnabled, setGstEnabled] = useState(false);
-  const [paidAmount, setPaidAmount] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Online' | 'UPI' | 'Card' | 'Other' | 'Split'>('UPI');
   
   // Split payment details
   const [cashSplit, setCashSplit] = useState(0);
   const [onlineSplit, setOnlineSplit] = useState(0);
+  const paidAmount = cashSplit + onlineSplit;
+  const paymentMethod = 'Split';
 
   // STEP 4: Review / Result States
   const [orderId, setOrderId] = useState('');
@@ -200,12 +200,6 @@ export const NewBooking: React.FC = () => {
     if (paidAmount > grandTotal) {
       toast.error('Paid amount cannot exceed Grand Total.');
       return false;
-    }
-    if (paymentMethod === 'Split') {
-      if (cashSplit + onlineSplit !== paidAmount) {
-        toast.error(`Split payments sum (₹${cashSplit + onlineSplit}) must equal paid amount (₹${paidAmount}).`);
-        return false;
-      }
     }
     return true;
   };
@@ -378,14 +372,22 @@ export const NewBooking: React.FC = () => {
     doc.text(`Rs. ${grandTotal.toLocaleString()}`, 170, yPos);
 
     yPos += 6;
-    doc.setTextColor(40, 150, 40);
-    doc.text('Paid Amount:', 130, yPos);
-    doc.text(`Rs. ${paidAmount.toLocaleString()}`, 170, yPos);
-
-    yPos += 6;
     doc.setTextColor(200, 40, 40);
     doc.text('Outstanding Due:', 130, yPos);
     doc.text(`Rs. ${remainingBalance.toLocaleString()}`, 170, yPos);
+
+    if (paidAmount > 0 && remainingBalance > 0) {
+      yPos += 8;
+      doc.setFillColor(254, 243, 199); // Amber background
+      doc.rect(15, yPos, 180, 10, 'F');
+      doc.setDrawColor(245, 158, 11); // Amber border
+      doc.rect(15, yPos, 180, 10, 'D');
+      doc.setTextColor(180, 83, 9); // Amber text
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.text(`ADVANCE PAYMENT RECEIVED: Rs. ${paidAmount.toLocaleString()} | BALANCE DUE AT DELIVERY: Rs. ${remainingBalance.toLocaleString()}`, 19, yPos + 6.5);
+      yPos += 10;
+    }
 
     // Terms & QR Code
     yPos = Math.max(yPos + 15, 175);
@@ -747,67 +749,36 @@ _Open this link at the shop to verify payment and confirm pickup._`;
                 </div>
               </div>
 
-              {/* Paid Amount */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase">Paid Deposit (₹)</label>
-                <input
-                  type="number"
-                  min={0}
-                  max={grandTotal}
-                  value={paidAmount || ''}
-                  onChange={(e) => setPaidAmount(parseFloat(e.target.value) || 0)}
-                  className="w-full px-4 py-2 border border-border bg-background rounded-xl font-bold text-saffron"
-                />
-              </div>
-
-              {/* Payment Method */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase">Primary Payment Channel</label>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value as any)}
-                  className="w-full px-4 py-2 border border-border bg-background rounded-xl font-semibold cursor-pointer"
-                >
-                  <option value="UPI">UPI / Net Banking</option>
-                  <option value="Cash">Cash Ledger</option>
-                  <option value="Card">Credit/Debit Card</option>
-                  <option value="Online">Online Gateway</option>
-                  <option value="Split">Split Payment</option>
-                </select>
-              </div>
-
-              {/* Split details if selected */}
-              {paymentMethod === 'Split' && (
-                <div className="p-3 bg-muted/40 border border-border rounded-xl space-y-3.5">
-                  <span className="text-[9px] font-bold text-muted-foreground uppercase block">Split Configuration</span>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <span className="block text-[8px] font-bold text-muted-foreground uppercase">Cash Portion (₹)</span>
-                      <input
-                        type="number"
-                        min={0}
-                        value={cashSplit || ''}
-                        onChange={(e) => setCashSplit(parseFloat(e.target.value) || 0)}
-                        className="w-full px-3 py-1.5 border border-border bg-background rounded-lg font-semibold"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <span className="block text-[8px] font-bold text-muted-foreground uppercase">Online/UPI Portion (₹)</span>
-                      <input
-                        type="number"
-                        min={0}
-                        value={onlineSplit || ''}
-                        onChange={(e) => setOnlineSplit(parseFloat(e.target.value) || 0)}
-                        className="w-full px-3 py-1.5 border border-border bg-background rounded-lg font-semibold"
-                      />
-                    </div>
+              {/* Split Payment inputs directly */}
+              <div className="p-4 bg-muted/30 border border-border rounded-2xl space-y-4">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase block">Record Deposit Payments</span>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="block text-[9px] font-bold text-muted-foreground uppercase">Cash Amount (₹)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={cashSplit || ''}
+                      onChange={(e) => setCashSplit(parseFloat(e.target.value) || 0)}
+                      className="w-full px-4 py-2 border border-border bg-background rounded-xl font-semibold text-xs"
+                    />
                   </div>
-                  <div className="flex justify-between items-center text-[10px] font-semibold">
-                    <span className="text-muted-foreground">Configured: ₹{cashSplit + onlineSplit}</span>
-                    <span className={cashSplit + onlineSplit === paidAmount ? 'text-green-600' : 'text-red-500'}>Required: ₹{paidAmount}</span>
+                  <div className="space-y-1.5">
+                    <label className="block text-[9px] font-bold text-muted-foreground uppercase">Online/UPI Amount (₹)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={onlineSplit || ''}
+                      onChange={(e) => setOnlineSplit(parseFloat(e.target.value) || 0)}
+                      className="w-full px-4 py-2 border border-border bg-background rounded-xl font-semibold text-xs"
+                    />
                   </div>
                 </div>
-              )}
+                <div className="flex justify-between items-center text-xs font-bold pt-2 border-t border-border/40">
+                  <span className="text-muted-foreground">Total Paid Deposit:</span>
+                  <span className="text-saffron text-sm">₹{paidAmount.toLocaleString()}</span>
+                </div>
+              </div>
             </div>
 
             <div className="flex justify-between items-center pt-3 border-t border-border">
@@ -891,6 +862,19 @@ _Open this link at the shop to verify payment and confirm pickup._`;
             <p className="text-xs text-muted-foreground mt-1">Invoice number: <strong>{orderId}</strong></p>
           </div>
 
+          {paidAmount > 0 && remainingBalance > 0 && (
+            <div className="p-3.5 bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-400 rounded-2xl text-xs font-semibold space-y-1 max-w-xs mx-auto text-left">
+              <p className="flex justify-between">
+                <span>Advance Paid:</span>
+                <span>₹{paidAmount.toLocaleString()}</span>
+              </p>
+              <p className="flex justify-between text-red-500 font-bold border-t border-amber-500/20 pt-1 mt-1">
+                <span>Balance Due at Delivery:</span>
+                <span>₹{remainingBalance.toLocaleString()}</span>
+              </p>
+            </div>
+          )}
+
           {/* Secure QR Display */}
           {qrCodeDataUrl && (
             <div className="p-4 bg-white border border-slate-100 rounded-2xl inline-block shadow-sm glow-saffron">
@@ -927,8 +911,6 @@ _Open this link at the shop to verify payment and confirm pickup._`;
               setCustNotes('');
               setDiscount(0);
               setGstEnabled(false);
-              setPaidAmount(0);
-              setPaymentMethod('UPI');
               setCashSplit(0);
               setOnlineSplit(0);
               setQrTokenData('');

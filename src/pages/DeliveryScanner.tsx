@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useState, useEffect, useRef } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { getOrder, confirmDelivery } from '../firebase/db';
 import type { Order } from '../types';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -13,7 +13,8 @@ import {
   DollarSign, 
   Package, 
   X,
-  Smartphone
+  Smartphone,
+  Upload
 } from 'lucide-react';
 import { toast } from 'sonner';
 import dayjs from 'dayjs';
@@ -55,8 +56,10 @@ export const DeliveryScanner: React.FC = () => {
   const [scannedOrder, setScannedOrder] = useState<Order | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
   const [processingDelivery, setProcessingDelivery] = useState(false);
+  const [uploadProcessing, setUploadProcessing] = useState(false);
   
   const qrScannerRef = useRef<Html5Qrcode | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const readerId = "qr-reader-viewport";
 
   const processScannedToken = useCallback(async (decodedText: string, sourceLabel = 'QR Code') => {
@@ -153,6 +156,31 @@ export const DeliveryScanner: React.FC = () => {
     // Quiet scan failure (html5-qrcode logs every frame it doesn't find a QR code)
   };
 
+  // --- QR IMAGE UPLOAD ---
+  const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+
+    setUploadProcessing(true);
+    setScanError(null);
+    setScannedOrder(null);
+    toast.info('Reading QR from uploaded image...');
+
+    try {
+      const tempScanner = new Html5Qrcode('qr-upload-temp');
+      const decodedText = await tempScanner.scanFile(file, false);
+      await processScannedToken(decodedText, 'Uploaded QR Image');
+    } catch (err: any) {
+      console.error('QR upload decode failed:', err);
+      setScanError('Could not decode QR from image. Ensure the image is clear and contains a valid booking QR code.');
+      toast.error('Failed to decode QR from image.');
+    } finally {
+      setUploadProcessing(false);
+    }
+  };
+
   // --- CONFIRM DELIVERY ---
   const handleConfirmDelivery = async () => {
     if (!scannedOrder) return;
@@ -214,25 +242,44 @@ export const DeliveryScanner: React.FC = () => {
 
         {/* State 2: Scanner Off & Waiting to Scan */}
         {!scannerActive && !scannedOrder && !scanError && (
-          <div className="py-14 text-center space-y-4">
+          <div className="py-10 text-center space-y-5">
             <div className="mx-auto h-16 w-16 bg-gradient-to-tr from-saffron/15 to-gold/15 text-saffron rounded-2xl flex items-center justify-center shadow-sm border border-saffron/10">
               <Scan className="h-8 w-8 animate-pulse" />
             </div>
             <div className="space-y-1.5">
-              <h3 className="font-bold text-foreground text-sm">Ready to Scan QR</h3>
-              <p className="text-xs text-muted-foreground max-w-xs mx-auto">Scan the invoice QR code, or open the pickup confirmation link shared on WhatsApp.</p>
+              <h3 className="font-bold text-foreground text-sm">Ready to Verify Booking</h3>
+              <p className="text-xs text-muted-foreground max-w-xs mx-auto">Scan the invoice QR with camera, or upload a QR image from your device.</p>
             </div>
-            <button
-              onClick={startScanner}
-              className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-saffron to-gold text-white text-xs font-bold rounded-xl shadow-lg shadow-saffron/10 hover:brightness-105 cursor-pointer mx-auto"
-            >
-              <Camera className="h-4.5 w-4.5" />
-              <span>Start Camera Scanner</span>
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                onClick={startScanner}
+                className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-saffron to-gold text-white text-xs font-bold rounded-xl shadow-lg shadow-saffron/10 hover:brightness-105 cursor-pointer"
+              >
+                <Camera className="h-4.5 w-4.5" />
+                <span>Start Camera Scanner</span>
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadProcessing}
+                className="flex items-center space-x-2 px-6 py-3 border border-saffron/30 text-saffron bg-saffron/5 hover:bg-saffron/10 text-xs font-bold rounded-xl cursor-pointer disabled:opacity-50"
+              >
+                <Upload className="h-4.5 w-4.5" />
+                <span>{uploadProcessing ? 'Reading QR...' : 'Upload QR Image'}</span>
+              </button>
+            </div>
+            {/* Hidden file input + temp div for html5-qrcode */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleUploadFile}
+            />
+            <div id="qr-upload-temp" className="hidden" />
           </div>
         )}
 
-        {/* State 3: Scan Error Display */}
+        {/* Upload error/retry also shows upload button */}
         {scanError && (
           <div className="w-full py-10 text-center space-y-4">
             <div className="mx-auto h-14 w-14 bg-red-100 dark:bg-red-950/20 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center">
@@ -242,7 +289,7 @@ export const DeliveryScanner: React.FC = () => {
               <h3 className="font-bold text-foreground text-sm">Verification Failed</h3>
               <p className="text-xs text-red-500 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-950/50 p-4 rounded-xl font-medium leading-relaxed">{scanError}</p>
             </div>
-            <div className="flex justify-center space-x-2.5">
+            <div className="flex flex-wrap justify-center gap-2.5">
               <button
                 onClick={() => setScanError(null)}
                 className="px-5 py-2 border border-border hover:bg-muted text-xs font-bold rounded-xl cursor-pointer"
@@ -253,11 +300,27 @@ export const DeliveryScanner: React.FC = () => {
                 onClick={startScanner}
                 className="px-5 py-2 bg-saffron text-white text-xs font-bold rounded-xl shadow-md cursor-pointer"
               >
-                Try Again
+                Try Camera
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center space-x-1.5 px-5 py-2 border border-saffron/30 text-saffron bg-saffron/5 hover:bg-saffron/10 text-xs font-bold rounded-xl cursor-pointer"
+              >
+                <Upload className="h-4 w-4" />
+                <span>Upload QR</span>
               </button>
             </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleUploadFile}
+            />
+            <div id="qr-upload-temp" className="hidden" />
           </div>
         )}
+
 
         {/* State 4: Scanned Order Verification Detail Cards */}
         {scannedOrder && (

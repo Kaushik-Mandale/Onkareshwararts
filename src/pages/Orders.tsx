@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -44,8 +44,8 @@ export const Orders: React.FC = () => {
 
   // Modals / Actions states
   const [paymentModalOrder, setPaymentModalOrder] = useState<Order | null>(null);
-  const [payAmount, setPayAmount] = useState(0);
-  const [payMethod, setPayMethod] = useState<PaymentHistory['method']>('UPI');
+  const [payCash, setPayCash] = useState(0);
+  const [payUpi, setPayUpi] = useState(0);
   const [payNotes, setPayNotes] = useState('');
   
   const [refundModalOrder, setRefundModalOrder] = useState<Order | null>(null);
@@ -82,18 +82,38 @@ export const Orders: React.FC = () => {
   // --- ACTIONS ---
   const handleAddPaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!paymentModalOrder || payAmount <= 0) return;
+    if (!paymentModalOrder) return;
+    const totalAmount = payCash + payUpi;
+    if (totalAmount <= 0) {
+      toast.error('Please enter a payment amount.');
+      return;
+    }
+    if (totalAmount > paymentModalOrder.payment.remaining) {
+      toast.error(`Total payment of ₹${totalAmount} exceeds remaining balance of ₹${paymentModalOrder.payment.remaining}`);
+      return;
+    }
     
     try {
-      await addPaymentToOrder(
-        paymentModalOrder.orderNumber, 
-        payAmount, 
-        payMethod, 
-        payNotes.trim() || 'Installment Payment'
-      );
-      toast.success(`Payment of ₹${payAmount} added successfully.`);
+      if (payCash > 0) {
+        await addPaymentToOrder(
+          paymentModalOrder.orderNumber, 
+          payCash, 
+          'Cash', 
+          payNotes.trim() ? `${payNotes.trim()} (Cash Portion)` : 'Installment Payment (Cash)'
+        );
+      }
+      if (payUpi > 0) {
+        await addPaymentToOrder(
+          paymentModalOrder.orderNumber, 
+          payUpi, 
+          'UPI', 
+          payNotes.trim() ? `${payNotes.trim()} (UPI Portion)` : 'Installment Payment (UPI)'
+        );
+      }
+      toast.success(`Payment of ₹${totalAmount} added successfully.`);
       setPaymentModalOrder(null);
-      setPayAmount(0);
+      setPayCash(0);
+      setPayUpi(0);
       setPayNotes('');
     } catch (err: any) {
       toast.error('Payment failed: ' + err.message);
@@ -241,14 +261,22 @@ export const Orders: React.FC = () => {
     doc.text(`Rs. ${order.payment.grandTotal.toLocaleString()}`, 170, yPos);
 
     yPos += 6;
-    doc.setTextColor(40, 150, 40);
-    doc.text('Paid Amount:', 130, yPos);
-    doc.text(`Rs. ${order.payment.paid.toLocaleString()}`, 170, yPos);
-
-    yPos += 6;
     doc.setTextColor(200, 40, 40);
     doc.text('Outstanding Due:', 130, yPos);
     doc.text(`Rs. ${order.payment.remaining.toLocaleString()}`, 170, yPos);
+
+    if (order.payment.paid > 0 && order.payment.remaining > 0) {
+      yPos += 8;
+      doc.setFillColor(254, 243, 199); // Amber background
+      doc.rect(15, yPos, 180, 10, 'F');
+      doc.setDrawColor(245, 158, 11); // Amber border
+      doc.rect(15, yPos, 180, 10, 'D');
+      doc.setTextColor(180, 83, 9); // Amber text
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.text(`ADVANCE PAYMENT RECEIVED: Rs. ${order.payment.paid.toLocaleString()} | BALANCE DUE AT DELIVERY: Rs. ${order.payment.remaining.toLocaleString()}`, 19, yPos + 6.5);
+      yPos += 10;
+    }
 
     // Embed QR delivery token in reprinted PDF
     try {
@@ -309,6 +337,11 @@ _Open this link at the shop to verify payment and confirm pickup._`;
   const getOrderPayments = (orderNo: string) => {
     return payments.filter(p => p.orderId === orderNo);
   };
+  const totalBookings = orders.length;
+  const bookedCount = orders.filter(o => o.status === 'booked').length;
+  const pendingCount = orders.filter(o => o.status === 'pending').length;
+  const deliveredCount = orders.filter(o => o.status === 'delivered').length;
+  const cancelledCount = orders.filter(o => o.status === 'cancelled').length;
 
   return (
     <div className="space-y-6">
@@ -317,6 +350,30 @@ _Open this link at the shop to verify payment and confirm pickup._`;
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-foreground">Order Manager</h2>
           <p className="text-sm text-muted-foreground">Monitor client bookings, confirm deposits, and process refunds</p>
+        </div>
+      </div>
+
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="bg-card border border-border p-3.5 rounded-2xl flex flex-col justify-between shadow-sm">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase">Total Bookings</span>
+          <strong className="text-lg text-foreground mt-1">{totalBookings}</strong>
+        </div>
+        <div className="bg-card border border-border p-3.5 rounded-2xl flex flex-col justify-between shadow-sm border-l-4 border-l-saffron">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase">Booked (Active)</span>
+          <strong className="text-lg text-saffron mt-1">{bookedCount}</strong>
+        </div>
+        <div className="bg-card border border-border p-3.5 rounded-2xl flex flex-col justify-between shadow-sm border-l-4 border-l-amber-500">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase">Pending Pickup</span>
+          <strong className="text-lg text-amber-500 mt-1">{pendingCount}</strong>
+        </div>
+        <div className="bg-card border border-border p-3.5 rounded-2xl flex flex-col justify-between shadow-sm border-l-4 border-l-green-500">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase">Delivered</span>
+          <strong className="text-lg text-green-500 mt-1">{deliveredCount}</strong>
+        </div>
+        <div className="bg-card border border-border p-3.5 rounded-2xl flex flex-col justify-between shadow-sm border-l-4 border-l-red-500 col-span-2 md:col-span-1">
+          <span className="text-[10px] font-bold text-muted-foreground uppercase">Cancelled</span>
+          <strong className="text-lg text-red-500 mt-1">{cancelledCount}</strong>
         </div>
       </div>
 
@@ -473,6 +530,13 @@ _Open this link at the shop to verify payment and confirm pickup._`;
                               <p className="text-foreground italic mt-0.5 bg-card p-3 rounded-lg border border-border">{order.notes}</p>
                             </div>
                           )}
+                          {order.status !== 'delivered' && order.status !== 'cancelled' && order.payment.paid > 0 && order.payment.remaining > 0 && (
+                            <div className="col-span-2 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-xl text-amber-700 dark:text-amber-400">
+                              <span className="text-[9px] font-bold uppercase block">Advance Payment Info</span>
+                              <p className="mt-1 font-semibold text-xs">Advance Deposit Paid: ₹{order.payment.paid.toLocaleString()}</p>
+                              <p className="text-[10px] text-red-600 dark:text-red-400 font-bold mt-0.5">Remaining Balance to Collect at Delivery: ₹{order.payment.remaining.toLocaleString()}</p>
+                            </div>
+                          )}
                           {order.status === 'delivered' && (
                             <div className="col-span-2 p-3 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/50 rounded-xl text-green-700 dark:text-green-400">
                               <span className="text-[9px] font-bold uppercase block">Delivery Verified</span>
@@ -627,31 +691,41 @@ _Open this link at the shop to verify payment and confirm pickup._`;
                 <span className="text-muted-foreground">Outstanding Balance:</span>
                 <p className="text-lg font-bold text-red-500">₹{paymentModalOrder.payment.remaining.toLocaleString()}</p>
               </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold text-muted-foreground uppercase">Collect Amount (₹) *</label>
-                <input
-                  type="number"
-                  required
-                  min={1}
-                  max={paymentModalOrder.payment.remaining}
-                  value={payAmount || ''}
-                  onChange={(e) => setPayAmount(parseFloat(e.target.value) || 0)}
-                  className="w-full px-4 py-2 border border-border bg-background rounded-xl font-bold text-saffron text-sm"
-                />
+              
+              <div className="p-3 bg-muted/40 border border-border rounded-xl space-y-3.5">
+                <span className="text-[9px] font-bold text-muted-foreground uppercase block">Split Configuration</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <span className="block text-[8px] font-bold text-muted-foreground uppercase">Cash Portion (₹)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={paymentModalOrder.payment.remaining}
+                      value={payCash || ''}
+                      onChange={(e) => setPayCash(parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-1.5 border border-border bg-background rounded-lg font-semibold"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="block text-[8px] font-bold text-muted-foreground uppercase">Online/UPI Portion (₹)</span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={paymentModalOrder.payment.remaining}
+                      value={payUpi || ''}
+                      onChange={(e) => setPayUpi(parseFloat(e.target.value) || 0)}
+                      className="w-full px-3 py-1.5 border border-border bg-background rounded-lg font-semibold"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-between items-center text-[10px] font-semibold pt-1 border-t border-border/40">
+                  <span className="text-muted-foreground">Total: ₹{payCash + payUpi}</span>
+                  <span className={payCash + payUpi > 0 && payCash + payUpi <= paymentModalOrder.payment.remaining ? 'text-green-600' : 'text-red-500'}>
+                    Remaining: ₹{paymentModalOrder.payment.remaining - (payCash + payUpi)}
+                  </span>
+                </div>
               </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-bold text-muted-foreground uppercase">Payment Channel</label>
-                <select
-                  value={payMethod}
-                  onChange={(e) => setPayMethod(e.target.value as any)}
-                  className="w-full px-4 py-2 border border-border bg-background rounded-xl font-semibold"
-                >
-                  <option value="UPI">UPI / Net Banking</option>
-                  <option value="Cash">Cash Ledger</option>
-                  <option value="Card">Credit/Debit Card</option>
-                  <option value="Online">Online Gateway</option>
-                </select>
-              </div>
+
               <div className="space-y-1">
                 <label className="text-[9px] font-bold text-muted-foreground uppercase">Ledger Remarks</label>
                 <input
