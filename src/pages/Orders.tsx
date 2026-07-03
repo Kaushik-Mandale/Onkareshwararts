@@ -261,6 +261,11 @@ export const Orders: React.FC = () => {
     doc.text(`Rs. ${order.payment.grandTotal.toLocaleString()}`, 170, yPos);
 
     yPos += 6;
+    doc.setTextColor(40, 150, 40);
+    doc.text('Paid Amount:', 130, yPos);
+    doc.text(`Rs. ${order.payment.paid.toLocaleString()}`, 170, yPos);
+
+    yPos += 6;
     doc.setTextColor(200, 40, 40);
     doc.text('Outstanding Due:', 130, yPos);
     doc.text(`Rs. ${order.payment.remaining.toLocaleString()}`, 170, yPos);
