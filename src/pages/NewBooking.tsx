@@ -67,8 +67,8 @@ export const NewBooking: React.FC = () => {
   const [matchingCustomer, setMatchingCustomer] = useState<Customer | null>(null);
 
   // STEP 3: Payment States
-  const [discount, setDiscount] = useState(0);
-  const [gstEnabled, setGstEnabled] = useState(false);
+  const discount = 0;
+  const gstEnabled = false;
   
   // Split payment details
   const [cashSplit, setCashSplit] = useState(0);
@@ -727,33 +727,6 @@ _Open this link at the shop to verify payment and confirm pickup._`;
             <h3 className="font-bold text-xs text-foreground uppercase tracking-wider border-b border-border pb-3 flex items-center"><CreditCard className="h-4.5 w-4.5 text-saffron mr-2" /> Billing ledger</h3>
             
             <div className="space-y-4 text-xs">
-              <div className="grid grid-cols-2 gap-4">
-                {/* Discount */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Apply Discount (₹)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={discount || ''}
-                    onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
-                    className="w-full px-4 py-2 border border-border bg-background rounded-xl font-semibold"
-                  />
-                </div>
-
-                {/* GST rate */}
-                <div className="space-y-2 pt-5">
-                  <label className="flex items-center space-x-2 text-foreground font-semibold cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={gstEnabled}
-                      onChange={(e) => setGstEnabled(e.target.checked)}
-                      className="rounded text-saffron focus:ring-saffron"
-                    />
-                    <span>Charge GST ({gstRate}%)</span>
-                  </label>
-                </div>
-              </div>
-
               {/* Split Payment inputs directly */}
               <div className="p-4 bg-muted/30 border border-border rounded-2xl space-y-4">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase block">Record Deposit Payments</span>
@@ -814,17 +787,6 @@ _Open this link at the shop to verify payment and confirm pickup._`;
                 <span>Total Items Selling Value:</span>
                 <span className="font-semibold text-foreground">₹{subtotal.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between text-muted-foreground">
-                <span>Applied Discount:</span>
-                <span className="font-semibold text-red-500">-₹{discount.toLocaleString()}</span>
-              </div>
-              {gstEnabled && (
-                <div className="flex justify-between text-muted-foreground">
-                  <span>GST ({gstRate}%):</span>
-                  <span className="font-semibold text-foreground">+₹{gstAmount.toLocaleString()}</span>
-                </div>
-              )}
-
               <div className="border-t border-border pt-3.5 flex justify-between font-extrabold text-sm text-foreground">
                 <span>Grand Total:</span>
                 <span>₹{grandTotal.toLocaleString()}</span>
@@ -914,8 +876,6 @@ _Open this link at the shop to verify payment and confirm pickup._`;
               setCustMobile('');
               setCustAddress('');
               setCustNotes('');
-              setDiscount(0);
-              setGstEnabled(false);
               setCashSplit(0);
               setOnlineSplit(0);
               setQrTokenData('');
