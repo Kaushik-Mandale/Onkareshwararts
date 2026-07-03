@@ -65,6 +65,10 @@ function assertResourceOwnedByCurrentUser(resourceOwnerId?: string) {
   }
 }
 
+function dayTime(value?: string): number {
+  return value ? Date.parse(value) || 0 : 0;
+}
+
 async function assertDocumentOwnedByCurrentUser(ref: DocumentReference, resourceName: string): Promise<void> {
   if (!db) throw new Error('Database not configured');
   const ownerId = getCurrentOwnerId();
@@ -493,13 +497,12 @@ export async function createOrder(order: Omit<Order, 'createdBy' | 'createdAt'>)
 export function subscribeOrders(callback: (orders: Order[]) => void) {
   const ownerId = getCurrentOwnerId();
   if (!db || !ownerId) return () => {};
-  const q = query(
-    getColRef('orders'),
-    where('ownerId', '==', ownerId),
-    orderBy('createdAt', 'desc')
-  );
+  const q = query(getColRef('orders'));
   return onSnapshot(q, (snapshot) => {
-    callback(snapshot.docs.map(doc => ({ orderNumber: doc.id, ...doc.data() } as Order)));
+    const orders = snapshot.docs
+      .map(doc => ({ orderNumber: doc.id, ...doc.data() } as Order))
+      .sort((a, b) => dayTime(b.createdAt) - dayTime(a.createdAt));
+    callback(orders);
   });
 }
 
