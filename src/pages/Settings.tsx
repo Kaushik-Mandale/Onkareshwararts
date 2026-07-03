@@ -5,6 +5,7 @@ import {
   updateBusinessSettings, 
   logActivity,
   resetDatabaseForFreshStart,
+  resetAllDataForUser,
   getColRef,
   getDocRef
 } from '../firebase/db';
@@ -17,7 +18,7 @@ import {
   deleteDoc, 
   writeBatch 
 } from 'firebase/firestore';
-import { updatePassword } from 'firebase/auth';
+import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 
 import type { BusinessSettings, User as AppUser } from '../types';
 import { 
@@ -81,6 +82,12 @@ export const Settings: React.FC = () => {
 
   // Database Reset State
   const [resetting, setResetting] = useState(false);
+
+  // Full Reset Modal State
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetConfirmText, setResetConfirmText] = useState('');
+  const [fullResetting, setFullResetting] = useState(false);
 
   const loadUsers = useCallback(async () => {
     if (!db || currentUser?.role !== 'admin') return;
@@ -312,6 +319,36 @@ export const Settings: React.FC = () => {
     }
   };
 
+  const handleFullReset = async () => {
+    if (!firebaseUser || !currentUser) return;
+    if (resetConfirmText !== 'RESET') {
+      toast.error('Type RESET exactly to confirm.');
+      return;
+    }
+    setFullResetting(true);
+    try {
+      // Re-authenticate with password before wiping
+      const credential = EmailAuthProvider.credential(
+        firebaseUser.email!,
+        resetPassword
+      );
+      await reauthenticateWithCredential(firebaseUser, credential);
+      await resetAllDataForUser();
+      toast.success('✅ All data wiped. Fresh start ready!');
+      setResetModalOpen(false);
+      setResetPassword('');
+      setResetConfirmText('');
+    } catch (err: any) {
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        toast.error('❌ Wrong password. Reset cancelled.');
+      } else {
+        toast.error('❌ Reset failed: ' + err.message);
+      }
+    } finally {
+      setFullResetting(false);
+    }
+  };
+
   const handleResetDatabase = async () => {
     // Triple confirmation to prevent accidental data loss
     if (!window.confirm('⚠️ WARNING: This will delete ALL orders, payments, logs, and inventory history!\n\nThis action cannot be undone. Continue?')) {
@@ -413,132 +450,158 @@ export const Settings: React.FC = () => {
       {/* TAB 1: BUSINESS PROFILE */}
       {/* ========================================== */}
       {activeTab === 'profile' && (
-        <form onSubmit={handleSaveProfile} className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-6 max-w-3xl">
-          <div className="space-y-4">
-            <h3 className="font-bold text-xs text-foreground uppercase tracking-wider flex items-center border-b border-border pb-3"><Building className="h-4.5 w-4.5 text-saffron mr-2" /> Shop Information</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase">Shop Business Name</label>
-                <input
-                  type="text"
-                  required
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
-                  className="w-full px-4 py-2 border border-border bg-background rounded-xl"
-                />
-              </div>
+        <>
+          <form onSubmit={handleSaveProfile} className="bg-card border border-border rounded-2xl p-6 shadow-sm space-y-6 max-w-3xl">
+            <div className="space-y-4">
+              <h3 className="font-bold text-xs text-foreground uppercase tracking-wider flex items-center border-b border-border pb-3"><Building className="h-4.5 w-4.5 text-saffron mr-2" /> Shop Information</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Shop Business Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                    className="w-full px-4 py-2 border border-border bg-background rounded-xl"
+                  />
+                </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase">Owner Name</label>
-                <input
-                  type="text"
-                  value={ownerName}
-                  onChange={(e) => setOwnerName(e.target.value)}
-                  className="w-full px-4 py-2 border border-border bg-background rounded-xl"
-                />
-              </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Owner Name</label>
+                  <input
+                    type="text"
+                    value={ownerName}
+                    onChange={(e) => setOwnerName(e.target.value)}
+                    className="w-full px-4 py-2 border border-border bg-background rounded-xl"
+                  />
+                </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase">Business Phone Number</label>
-                <input
-                  type="text"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full px-4 py-2 border border-border bg-background rounded-xl"
-                />
-              </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Business Phone Number</label>
+                  <input
+                    type="text"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    className="w-full px-4 py-2 border border-border bg-background rounded-xl"
+                  />
+                </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase">WhatsApp Number</label>
-                <input
-                  type="text"
-                  value={whatsapp}
-                  onChange={(e) => setWhatsapp(e.target.value)}
-                  className="w-full px-4 py-2 border border-border bg-background rounded-xl"
-                />
-              </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">WhatsApp Number</label>
+                  <input
+                    type="text"
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value)}
+                    className="w-full px-4 py-2 border border-border bg-background rounded-xl"
+                  />
+                </div>
 
-              <div className="space-y-1 md:col-span-2">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase">Shop Physical Address</label>
-                <textarea
-                  rows={2}
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  className="w-full px-4 py-2 border border-border bg-background rounded-xl"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="font-bold text-xs text-foreground uppercase tracking-wider flex items-center border-b border-border pb-3"><Building className="h-4.5 w-4.5 text-gold mr-2" /> Banking &amp; UPI Ledger Settings</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase">UPI Virtual ID</label>
-                <input
-                  type="text"
-                  placeholder="name@upi"
-                  value={upiId}
-                  onChange={(e) => setUpiId(e.target.value)}
-                  className="w-full px-4 py-2 border border-border bg-background rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase">Bank Account Name</label>
-                <input
-                  type="text"
-                  value={accountName}
-                  onChange={(e) => setAccountName(e.target.value)}
-                  className="w-full px-4 py-2 border border-border bg-background rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase">Account Number</label>
-                <input
-                  type="text"
-                  value={accountNumber}
-                  onChange={(e) => setAccountNumber(e.target.value)}
-                  className="w-full px-4 py-2 border border-border bg-background rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase">IFSC Code</label>
-                <input
-                  type="text"
-                  value={ifscCode}
-                  onChange={(e) => setIfscCode(e.target.value)}
-                  className="w-full px-4 py-2 border border-border bg-background rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-muted-foreground uppercase">Bank Name</label>
-                <input
-                  type="text"
-                  value={bankName}
-                  onChange={(e) => setBankName(e.target.value)}
-                  className="w-full px-4 py-2 border border-border bg-background rounded-xl"
-                />
+                <div className="space-y-1 md:col-span-2">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Shop Physical Address</label>
+                  <textarea
+                    rows={2}
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className="w-full px-4 py-2 border border-border bg-background rounded-xl"
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex justify-end pt-2 border-t border-border">
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex items-center space-x-1.5 px-6 py-2.5 bg-gradient-to-r from-saffron to-gold text-white font-bold rounded-xl text-xs shadow-md cursor-pointer"
-            >
-              <Save className="h-4 w-4" />
-              <span>{saving ? 'Saving...' : 'Save Profile Details'}</span>
-            </button>
+            <div className="space-y-4">
+              <h3 className="font-bold text-xs text-foreground uppercase tracking-wider flex items-center border-b border-border pb-3"><Building className="h-4.5 w-4.5 text-gold mr-2" /> Banking &amp; UPI Ledger Settings</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">UPI Virtual ID</label>
+                  <input
+                    type="text"
+                    placeholder="name@upi"
+                    value={upiId}
+                    onChange={(e) => setUpiId(e.target.value)}
+                    className="w-full px-4 py-2 border border-border bg-background rounded-xl"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Bank Account Name</label>
+                  <input
+                    type="text"
+                    value={accountName}
+                    onChange={(e) => setAccountName(e.target.value)}
+                    className="w-full px-4 py-2 border border-border bg-background rounded-xl"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Account Number</label>
+                  <input
+                    type="text"
+                    value={accountNumber}
+                    onChange={(e) => setAccountNumber(e.target.value)}
+                    className="w-full px-4 py-2 border border-border bg-background rounded-xl"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">IFSC Code</label>
+                  <input
+                    type="text"
+                    value={ifscCode}
+                    onChange={(e) => setIfscCode(e.target.value)}
+                    className="w-full px-4 py-2 border border-border bg-background rounded-xl"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Bank Name</label>
+                  <input
+                    type="text"
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                    className="w-full px-4 py-2 border border-border bg-background rounded-xl"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-border">
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex items-center space-x-1.5 px-6 py-2.5 bg-gradient-to-r from-saffron to-gold text-white font-bold rounded-xl text-xs shadow-md cursor-pointer"
+              >
+                <Save className="h-4 w-4" />
+                <span>{saving ? 'Saving...' : 'Save Profile Details'}</span>
+              </button>
+            </div>
+          </form>
+
+          {/* ── Danger Zone ─────────────────────────────── */}
+          <div className="bg-card border border-red-500/25 rounded-2xl p-5 shadow-sm max-w-3xl space-y-4">
+            <h3 className="font-bold text-xs text-red-500 uppercase tracking-wider border-b border-red-500/20 pb-3 flex items-center">
+              <AlertTriangle className="h-4 w-4 mr-2" /> Danger Zone
+            </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold text-foreground">Reset All My Data</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Permanently deletes all your orders, products, customers, payments and logs.
+                  Your account login is preserved.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setResetModalOpen(true); setResetPassword(''); setResetConfirmText(''); }}
+                className="shrink-0 flex items-center space-x-1.5 px-5 py-2.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-bold rounded-xl text-xs shadow-lg shadow-red-500/20 transition-all cursor-pointer"
+              >
+                <RotateCcw className="h-4 w-4" />
+                <span>Reset All Data</span>
+              </button>
+            </div>
           </div>
-        </form>
+        </>
       )}
 
       {/* ========================================== */}
@@ -837,6 +900,84 @@ export const Settings: React.FC = () => {
               >
                 <RotateCcw className={`h-4.5 w-4.5 ${resetting ? 'animate-spin' : ''}`} />
                 <span>{resetting ? 'Resetting...' : 'Delete All Transaction Data'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════
+          FULL RESET CONFIRMATION MODAL
+         ══════════════════════════════════════════════ */}
+      {resetModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}>
+          <div className="bg-card border border-red-500/30 rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+
+            {/* Header */}
+            <div className="flex items-start space-x-3">
+              <div className="p-2.5 bg-red-500/10 rounded-xl">
+                <AlertTriangle className="h-6 w-6 text-red-500" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-foreground">Reset All Data?</h3>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  This will permanently delete <span className="font-bold text-red-500">everything</span> — orders, products, customers, payments, and logs — for <span className="font-semibold">{currentUser?.name}</span>.
+                  Your login account is kept.
+                </p>
+              </div>
+            </div>
+
+            {/* Warning banner */}
+            <div className="flex items-start space-x-2 p-3 bg-red-500/8 border border-red-500/20 rounded-xl text-[11px] text-red-600 dark:text-red-400 leading-relaxed">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <span><strong>This action cannot be undone.</strong> Export a backup from the Database tab first if you need to keep your data.</span>
+            </div>
+
+            {/* Password field */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Your Login Password</label>
+              <input
+                type="password"
+                placeholder="Enter your password to confirm"
+                value={resetPassword}
+                onChange={e => setResetPassword(e.target.value)}
+                className="w-full px-4 py-2.5 border border-border bg-background rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500/40"
+                autoFocus
+              />
+            </div>
+
+            {/* Confirm text field */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">
+                Type <span className="text-red-500 font-extrabold">RESET</span> to confirm
+              </label>
+              <input
+                type="text"
+                placeholder="RESET"
+                value={resetConfirmText}
+                onChange={e => setResetConfirmText(e.target.value)}
+                className="w-full px-4 py-2.5 border border-border bg-background rounded-xl text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-red-500/40"
+              />
+            </div>
+
+            {/* Buttons */}
+            <div className="flex space-x-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setResetModalOpen(false)}
+                disabled={fullResetting}
+                className="flex-1 py-2.5 border border-border bg-muted/30 hover:bg-muted/60 text-foreground font-semibold rounded-xl text-xs transition-all cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleFullReset}
+                disabled={fullResetting || resetPassword.length < 4 || resetConfirmText !== 'RESET'}
+                className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:brightness-110 text-white font-bold rounded-xl text-xs shadow-lg shadow-red-500/25 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <RotateCcw className={`h-4 w-4 ${fullResetting ? 'animate-spin' : ''}`} />
+                <span>{fullResetting ? 'Wiping data...' : 'Yes, Reset Everything'}</span>
               </button>
             </div>
           </div>

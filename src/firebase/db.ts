@@ -954,3 +954,46 @@ export async function resetDatabaseForFreshStart(): Promise<void> {
     throw new Error('Failed to reset database: ' + (e instanceof Error ? e.message : 'Unknown error'));
   }
 }
+
+/**
+ * FULL WIPE — deletes every document in every collection for the current user.
+ * Clears: orders, payments, activity_logs, inventory_history, customers, products.
+ * The user account itself (Firebase Auth + users/ doc) is preserved.
+ */
+export async function resetAllDataForUser(): Promise<void> {
+  if (!db) throw new Error('Database not configured');
+
+  const collections = [
+    'orders',
+    'payments',
+    'activity_logs',
+    'inventory_history',
+    'customers',
+    'products',
+  ];
+
+  try {
+    for (const colName of collections) {
+      const snap = await getDocs(getColRef(colName));
+      for (const docSnap of snap.docs) {
+        await deleteDoc(docSnap.ref);
+      }
+    }
+
+    // Write a single fresh log entry so the DB isn't completely silent
+    await addDoc(getColRef('activity_logs'), {
+      ownerId: getCurrentOwnerId(),
+      action: 'Full Data Reset',
+      details: 'All data wiped for a fresh start. Account preserved.',
+      timestamp: new Date().toISOString(),
+      userId: auth?.currentUser?.uid || 'system',
+      username: auth?.currentUser?.email?.split('@')[0] || 'system',
+    });
+
+    console.log('Full user data reset completed.');
+  } catch (e) {
+    console.error('Full reset failed:', e);
+    throw new Error('Reset failed: ' + (e instanceof Error ? e.message : 'Unknown error'));
+  }
+}
+
