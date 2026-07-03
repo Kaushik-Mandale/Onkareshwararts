@@ -540,11 +540,17 @@ export async function addPaymentToOrder(orderNumber: string, amount: number, met
   const newStatus = newRemaining === 0 ? 'Paid' : newPaid > 0 ? 'Partial' : 'Pending';
 
   // Update order fields
-  await updateDoc(orderDocRef, {
+  const updates: any = {
     'payment.paid': newPaid,
     'payment.remaining': newRemaining,
     'payment.status': newStatus
-  });
+  };
+
+  if (order.status === 'booked') {
+    updates.status = 'pending';
+  }
+
+  await updateDoc(orderDocRef, updates);
 
   // Log Ledger Entry
   const paymentId = 'PAY-' + Math.floor(100000 + Math.random() * 900000);

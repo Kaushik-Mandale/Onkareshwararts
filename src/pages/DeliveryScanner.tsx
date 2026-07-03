@@ -193,8 +193,8 @@ export const DeliveryScanner: React.FC = () => {
       const totalCollected = collectCash + collectUpi;
 
       if (remaining > 0) {
-        if (totalCollected !== remaining) {
-          toast.error(`Please collect the exact remaining balance of ₹${remaining.toLocaleString()} (Current: ₹${totalCollected.toLocaleString()}).`);
+        if (totalCollected > remaining) {
+          toast.error(`Collected amount of ₹${totalCollected.toLocaleString()} exceeds remaining balance of ₹${remaining.toLocaleString()}.`);
           setProcessingDelivery(false);
           return;
         }
@@ -435,8 +435,10 @@ export const DeliveryScanner: React.FC = () => {
                   </div>
                   <div className="flex justify-between items-center text-[10px] font-semibold pt-1 border-t border-border/40">
                     <span className="text-muted-foreground">Configured: ₹{collectCash + collectUpi}</span>
-                    <span className={collectCash + collectUpi === scannedOrder.payment.remaining ? 'text-green-600 font-bold' : 'text-red-500 font-bold'}>
-                      Required: ₹{scannedOrder.payment.remaining}
+                    <span className={collectCash + collectUpi <= scannedOrder.payment.remaining ? 'text-green-600 font-bold' : 'text-red-500 font-bold'}>
+                      {collectCash + collectUpi <= scannedOrder.payment.remaining 
+                        ? `Remaining Balance After: ₹${(scannedOrder.payment.remaining - (collectCash + collectUpi)).toLocaleString()}` 
+                        : `Exceeds Balance by: ₹${((collectCash + collectUpi) - scannedOrder.payment.remaining).toLocaleString()}`}
                     </span>
                   </div>
                 </div>
