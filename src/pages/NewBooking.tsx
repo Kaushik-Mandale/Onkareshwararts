@@ -220,8 +220,9 @@ export const NewBooking: React.FC = () => {
     const qrToken = generateSecureQRToken(generatedOrderNo);
 
     // Generate QR Image base64
+    let qrData = '';
     try {
-      const qrData = await QRCode.toDataURL(qrToken, { width: 250, margin: 1 });
+      qrData = await QRCode.toDataURL(qrToken, { width: 250, margin: 1 });
       setQrCodeDataUrl(qrData);
     } catch (err) {
       console.error('Failed to generate QR data:', err);
@@ -265,15 +266,17 @@ export const NewBooking: React.FC = () => {
 
     try {
       await createOrder(orderPayload);
-      toast.success('Order booked! Opening WhatsApp to notify customer...');
+      toast.success('Order booked! Downloading invoice & opening WhatsApp...');
       setStep(4);
 
-      // Auto-send WhatsApp message to customer's number
+      // Auto-download invoice PDF immediately (use local vars — React state not yet settled)
+      setTimeout(() => generateAndSavePDF(generatedOrderNo, qrData), 300);
+
+      // Auto-open WhatsApp to customer's number with pre-filled message
       const autoMsg = buildWhatsAppMsg(generatedOrderNo, grandTotal, paidAmount, remainingBalance, paymentStatus);
       const phone = custMobile.trim().replace(/\D/g, '');
       const waNumber = phone.length === 10 ? `91${phone}` : phone;
-      const waUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(autoMsg)}`;
-      setTimeout(() => window.open(waUrl, '_blank'), 800);
+      setTimeout(() => window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(autoMsg)}`, '_blank'), 800);
     } catch (e: any) {
       console.error(e);
       toast.error('Booking failed: ' + e.message);
@@ -283,17 +286,17 @@ export const NewBooking: React.FC = () => {
   };
 
   // --- PDF GENERATOR ---
-  const handlePrintPDF = () => {
+  // Accepts optional overrides so it can be called right after booking
+  // before React state updates have settled.
+  const generateAndSavePDF = (orderIdOverride?: string, qrUrlOverride?: string) => {
+    const useOrderId = orderIdOverride ?? orderId;
+    const useQrUrl   = qrUrlOverride  ?? qrCodeDataUrl;
+
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4'
     });
-
-    // Theme Colors (used for PDF styling via jsPDF color methods)
-    const _saffron = '#E05A17';
-    const _gold = '#D4AF37';
-    void _saffron; void _gold;
 
     // Header
     doc.setFillColor(245, 240, 235);
@@ -302,7 +305,7 @@ export const NewBooking: React.FC = () => {
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(22);
     doc.text(businessSettings?.businessName || 'Onkareshwararts', 15, 20);
-    
+
     doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
     doc.setFont('Helvetica', 'normal');
@@ -316,10 +319,10 @@ export const NewBooking: React.FC = () => {
     doc.text('BOOKING INVOICE', 150, 20);
     doc.setFontSize(9);
     doc.setFont('Helvetica', 'normal');
-    doc.text(`Invoice No: ${orderId}`, 150, 26);
+    doc.text(`Invoice No: ${useOrderId}`, 150, 26);
     doc.text(`Date: ${dayjs().format('DD MMM YYYY, hh:mm A')}`, 150, 31);
 
-    // Bill To
+    // Customer Details
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(10);
     doc.text('CUSTOMER DETAILS:', 15, 55);
@@ -335,26 +338,25 @@ export const NewBooking: React.FC = () => {
     doc.setTextColor(255, 255, 255);
     doc.setFont('Helvetica', 'bold');
     doc.text('Description', 18, 85);
-    doc.text('Size', 80, 85);
     doc.text('Price (INR)', 115, 85);
     doc.text('Qty', 148, 85);
     doc.text('Total (INR)', 170, 85);
 
-    // Table Body
+    // Table Body — with product thumbnails
     let yPos = 92;
     doc.setFont('Helvetica', 'normal');
     doc.setTextColor(50, 50, 50);
+    const ROW_H = 22;
 
-    const ROW_H = 22; // taller rows to fit product thumbnail
     cart.forEach((item) => {
-      // Product thumbnail on the left
       if (item.product.photoUrl) {
         try {
           doc.addImage(item.product.photoUrl, 'JPEG', 15, yPos - 4, 16, 16);
-        } catch (_) { /* skip if image fails */ }
+        } catch (_) { /* skip if image format fails */ }
       }
       const textX = item.product.photoUrl ? 34 : 18;
       doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(9);
       doc.text(item.product.name, textX, yPos + 1);
       doc.setFont('Helvetica', 'normal');
       doc.setFontSize(8);
@@ -363,19 +365,17 @@ export const NewBooking: React.FC = () => {
       doc.text(`Rs. ${item.product.sellingPrice.toLocaleString()}`, 115, yPos + 3);
       doc.text(item.qty.toString(), 150, yPos + 3);
       doc.text(`Rs. ${(item.product.sellingPrice * item.qty).toLocaleString()}`, 170, yPos + 3);
-
-      // Bottom border line
       doc.setDrawColor(230, 230, 230);
       doc.line(15, yPos + ROW_H - 4, 195, yPos + ROW_H - 4);
       yPos += ROW_H;
     });
 
-    // Calculations Summary
+    // Summary
     yPos += 5;
     doc.setFont('Helvetica', 'normal');
     doc.text('Subtotal:', 130, yPos);
     doc.text(`Rs. ${subtotal.toLocaleString()}`, 170, yPos);
-    
+
     yPos += 6;
     doc.text('Discount:', 130, yPos);
     doc.text(`Rs. ${discount.toLocaleString()}`, 170, yPos);
@@ -403,14 +403,14 @@ export const NewBooking: React.FC = () => {
 
     if (paidAmount > 0 && remainingBalance > 0) {
       yPos += 8;
-      doc.setFillColor(254, 243, 199); // Amber background
+      doc.setFillColor(254, 243, 199);
       doc.rect(15, yPos, 180, 10, 'F');
-      doc.setDrawColor(245, 158, 11); // Amber border
+      doc.setDrawColor(245, 158, 11);
       doc.rect(15, yPos, 180, 10, 'D');
-      doc.setTextColor(180, 83, 9); // Amber text
+      doc.setTextColor(180, 83, 9);
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(8.5);
-      doc.text(`ADVANCE PAYMENT RECEIVED: Rs. ${paidAmount.toLocaleString()} | BALANCE DUE AT DELIVERY: Rs. ${remainingBalance.toLocaleString()}`, 19, yPos + 6.5);
+      doc.text(`ADVANCE RECEIVED: Rs. ${paidAmount.toLocaleString()} | BALANCE DUE: Rs. ${remainingBalance.toLocaleString()}`, 19, yPos + 6.5);
       yPos += 10;
     }
 
@@ -423,17 +423,18 @@ export const NewBooking: React.FC = () => {
     doc.setFont('Helvetica', 'normal');
     doc.text(businessSettings?.invoiceSettings?.terms || 'Delivery to be taken pre-festival.', 15, yPos + 5);
 
-    // Embed scannable QR Code
-    if (qrCodeDataUrl) {
-      doc.addImage(qrCodeDataUrl, 'PNG', 145, yPos, 45, 45);
+    if (useQrUrl) {
+      doc.addImage(useQrUrl, 'PNG', 145, yPos, 45, 45);
       doc.setFont('Helvetica', 'bold');
       doc.text('CONFIRMATION QR CODE', 145, yPos + 48);
     }
 
-    // Save
-    doc.save(`invoice_${orderId}.pdf`);
-    toast.success('Invoice PDF downloaded!');
+    doc.save(`invoice_${useOrderId}.pdf`);
+    toast.success('Invoice PDF downloaded! Share it in the WhatsApp chat.');
   };
+
+  // Wrapper for the manual Download Invoice button
+  const handlePrintPDF = () => generateAndSavePDF();
 
   // --- WHATSAPP MESSAGE BUILDER ---
   const buildWhatsAppMsg = (
