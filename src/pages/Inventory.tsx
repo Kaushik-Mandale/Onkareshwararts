@@ -159,12 +159,12 @@ export const Inventory: React.FC = () => {
   const [photoUrl, setPhotoUrl] = useState('');
   const [category, setCategory] = useState('Dagdusheth Shape');
   const [sellingPrice, setSellingPrice] = useState(0);
-  const [quantity, setQuantity] = useState(0);
+  const [quantity, setQuantity] = useState(1);
   const [size, setSize] = useState('2 feet');
-  const [weight, setWeight] = useState('10 kg');
+  const [weight, setWeight] = useState('');
   const [material, setMaterial] = useState('Clay / Shadu Mati');
   const [description, setDescription] = useState('');
-  const [lowStockLimit, setLowStockLimit] = useState(5);
+  const [lowStockLimit, setLowStockLimit] = useState(0);
   const [barcode, setBarcode] = useState('');
   
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -203,12 +203,12 @@ export const Inventory: React.FC = () => {
       setPhotoUrl('');
       setCategory('Dagdusheth Shape');
       setSellingPrice(0);
-      setQuantity(10);
+      setQuantity(1);
       setSize('1.5 feet');
-      setWeight('5 kg');
+      setWeight('');
       setMaterial('Clay / Shadu Mati');
       setDescription('');
-      setLowStockLimit(3);
+      setLowStockLimit(0);
       setBarcode(randomId);
     }
   }, [editingProduct, formOpen]);
@@ -241,8 +241,8 @@ export const Inventory: React.FC = () => {
   // Submit Product Form
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || sellingPrice <= 0 || quantity < 0) {
-      toast.error('Please fill in name, selling price, and quantity.');
+    if (!name || sellingPrice <= 0) {
+      toast.error('Please fill in name and selling price.');
       return;
     }
 
@@ -603,14 +603,10 @@ export const Inventory: React.FC = () => {
                     
                     <p className="text-[10px] text-muted-foreground line-clamp-2">{p.description || 'No description provided.'}</p>
                     
-                    <div className="grid grid-cols-3 gap-2 border-y border-border/60 py-2 text-[10px] text-muted-foreground">
+                    <div className="grid grid-cols-2 gap-2 border-y border-border/60 py-2 text-[10px] text-muted-foreground">
                       <div>
                         <span className="block text-[8px] font-semibold uppercase text-muted-foreground/85">Size</span>
                         <strong className="text-foreground">{p.size}</strong>
-                      </div>
-                      <div>
-                        <span className="block text-[8px] font-semibold uppercase text-muted-foreground/85">Weight</span>
-                        <strong className="text-foreground">{p.weight}</strong>
                       </div>
                       <div>
                         <span className="block text-[8px] font-semibold uppercase text-muted-foreground/85">Material</span>
@@ -772,18 +768,6 @@ export const Inventory: React.FC = () => {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Weight Details</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 10 kg, 4.5 kg"
-                    value={weight}
-                    onChange={(e) => setWeight(e.target.value)}
-                    className="w-full px-4 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-saffron/30"
-                  />
-                </div>
-
-
-                <div className="space-y-1">
                   <label className="text-[10px] font-bold text-muted-foreground uppercase">Selling Price (₹) *</label>
                   <input
                     type="number"
@@ -794,33 +778,6 @@ export const Inventory: React.FC = () => {
                     onChange={(e) => setSellingPrice(parseFloat(e.target.value) || 0)}
                     className="w-full px-4 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-saffron/30"
                   />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Initial Quantity *</label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    placeholder="10"
-                    value={quantity}
-                    onChange={(e) => setQuantity(parseInt(e.target.value) || 0)}
-                    className="w-full px-4 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-saffron/30"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-muted-foreground uppercase">Low Stock Limit *</label>
-                  <input
-                    type="number"
-                    required
-                    min={0}
-                    placeholder="3"
-                    value={lowStockLimit}
-                    onChange={(e) => setLowStockLimit(parseInt(e.target.value) || 0)}
-                    className="w-full px-4 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-saffron/30"
-                  />
-                  <p className="text-[9px] text-muted-foreground">Alert when available stock is this number or lower.</p>
                 </div>
 
                 <div className="space-y-1">
