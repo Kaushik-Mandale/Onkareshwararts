@@ -1,4 +1,5 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   subscribePayments, 
   subscribeOrders,
@@ -19,12 +20,14 @@ import { toast } from 'sonner';
 import dayjs from 'dayjs';
 
 export const Payments: React.FC = () => {
+  const { currentUser } = useAuth();
   const [payments, setPayments] = useState<PaymentHistory[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [methodFilter, setMethodFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState('All');
 
   useEffect(() => {
+    if (!currentUser) return;
     const unsubPayments = subscribePayments(setPayments);
     const unsubOrders = subscribeOrders(() => {});
 
@@ -32,7 +35,7 @@ export const Payments: React.FC = () => {
       unsubPayments();
       unsubOrders();
     };
-  }, []);
+  }, [currentUser]);
 
   const todayStr = dayjs().format('YYYY-MM-DD');
 

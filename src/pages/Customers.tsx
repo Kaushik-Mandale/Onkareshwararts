@@ -1,5 +1,6 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   subscribeCustomers, 
   subscribeOrders,
@@ -24,6 +25,7 @@ import { toast } from 'sonner';
 import dayjs from 'dayjs';
 
 export const Customers: React.FC = () => {
+  const { currentUser } = useAuth();
   const [searchParams] = useSearchParams();
   const searchParamQuery = searchParams.get('search') || '';
 
@@ -42,6 +44,7 @@ export const Customers: React.FC = () => {
   const tagList: Customer['tags'][number][] = ['VIP', 'Regular', 'Wholesale', 'Repeat Customer'];
 
   useEffect(() => {
+    if (!currentUser) return;
     const unsubCust = subscribeCustomers(setCustomers);
     const unsubOrd = subscribeOrders(setOrders);
 
@@ -49,7 +52,7 @@ export const Customers: React.FC = () => {
       unsubCust();
       unsubOrd();
     };
-  }, []);
+  }, [currentUser]);
 
   // Update search bar if query param changes
   useEffect(() => {

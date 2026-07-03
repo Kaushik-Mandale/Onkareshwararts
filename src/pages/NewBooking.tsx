@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   subscribeProducts, 
   lookupCustomerByMobile, 
@@ -50,6 +51,7 @@ function generateSecureQRToken(orderId: string): string {
 }
 
 export const NewBooking: React.FC = () => {
+  const { currentUser } = useAuth();
   const [step, setStep] = useState(1);
   const [products, setProducts] = useState<Product[]>([]);
   const [businessSettings, setBusinessSettings] = useState<any>(null);
@@ -84,6 +86,7 @@ export const NewBooking: React.FC = () => {
 
   // Load products & settings
   useEffect(() => {
+    if (!currentUser) return;
     const unsubscribe = subscribeProducts((data) => {
       setProducts(data.filter(p => p.status === 'active'));
     });
@@ -97,7 +100,7 @@ export const NewBooking: React.FC = () => {
       unsubscribe();
       settingsUnsubscribe();
     };
-  }, []);
+  }, [currentUser]);
 
   // Autofill customer lookup on mobile input
   useEffect(() => {

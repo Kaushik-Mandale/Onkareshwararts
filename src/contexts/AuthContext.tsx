@@ -8,7 +8,7 @@ import {
 import type { User as FirebaseUser } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db, isFirebaseConfigured } from '../firebase/config';
-import { getBusinessSettings, logActivity, setShopOwnerPath } from '../firebase/db';
+import { getBusinessSettings, logActivity } from '../firebase/db';
 import type { User as AppUser } from '../types';
 import { toast } from 'sonner';
 
@@ -101,12 +101,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const appUserData = userDoc.data() as AppUser;
           if (appUserData.status === 'active') {
             setCurrentUser(appUserData);
-            // Set shared shop owner path so all users read/write same shop data
-            // Admin uses their own path; staff uses the admin's path
-            const ownerPath = appUserData.role === 'admin'
-              ? (appUserData.username || fUser.email?.split('@')[0]?.toLowerCase() || 'vivek2026')
-              : (appUserData.ownerPath || 'vivek2026');
-            setShopOwnerPath(ownerPath);
             // Fetch settings for auto-logout configuration
             try {
               const settings = await getBusinessSettings();
@@ -124,18 +118,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // If auth exists but no Firestore profile, build a fallback based on email
           const username = fUser.email?.split('@')[0] || 'ram2026';
           const role = username === 'vivek2026' ? 'admin' : 'staff';
-          const ownerPath = role === 'admin' ? username : 'vivek2026';
           const fallbackUser: AppUser = {
             uid: fUser.uid,
             username,
             name: username === 'vivek2026' ? 'Vivek' : 'Ram',
             role,
-            ownerPath,
             status: 'active',
             createdAt: new Date().toISOString()
           };
           await setDoc(userDocRef, fallbackUser);
-          setShopOwnerPath(ownerPath);
           setCurrentUser(fallbackUser);
         }
       } else {
@@ -188,18 +179,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       if (!userDoc.exists()) {
         const role = username.toLowerCase() === 'vivek2026' ? 'admin' : 'staff';
-        const ownerPath = role === 'admin' ? username.trim().toLowerCase() : 'vivek2026';
         const newAppUser: AppUser = {
           uid: fUser.uid,
           username: username.trim().toLowerCase(),
           name: username.toLowerCase() === 'vivek2026' ? 'Vivek' : 'Ram',
           role,
-          ownerPath,
           status: 'active',
           createdAt: new Date().toISOString()
         };
         await setDoc(userDocRef, newAppUser);
-        setShopOwnerPath(ownerPath);
         setCurrentUser(newAppUser);
         await logActivity('Login', `Logged in and provisioned profile: ${username}`);
         return newAppUser;
@@ -210,11 +198,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error('This account has been deactivated.');
       }
       
-      // Set shared shop owner path
-      const ownerPath = appUserData.role === 'admin'
-        ? (appUserData.username || username.toLowerCase())
-        : (appUserData.ownerPath || 'vivek2026');
-      setShopOwnerPath(ownerPath);
       setCurrentUser(appUserData);
       await logActivity('Login', `User logged in: ${username}`);
       return appUserData;
@@ -234,19 +217,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const fUser = userCredential.user;
             
             const role = username.toLowerCase() === 'vivek2026' ? 'admin' : 'staff';
-            const ownerPath = role === 'admin' ? username.trim().toLowerCase() : 'vivek2026';
             const newAppUser: AppUser = {
               uid: fUser.uid,
               username: username.trim().toLowerCase(),
               name: username.toLowerCase() === 'vivek2026' ? 'Vivek' : 'Ram',
               role,
-              ownerPath,
               status: 'active',
               createdAt: new Date().toISOString()
             };
             
             await setDoc(doc(db, 'users', fUser.uid), newAppUser);
-            setShopOwnerPath(ownerPath);
             setCurrentUser(newAppUser);
             await logActivity('Login (Provisioned)', `First-time provision and login: ${username}`);
             return newAppUser;

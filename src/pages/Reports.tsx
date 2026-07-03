@@ -1,5 +1,6 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { subscribeOrders, subscribePayments } from '../firebase/db';
+import { useAuth } from '../contexts/AuthContext';
 import type { Order, PaymentHistory } from '../types';
 import { 
   BarChart as RechartsBarChart, 
@@ -24,6 +25,7 @@ import { toast } from 'sonner';
 import dayjs from 'dayjs';
 
 export const Reports: React.FC = () => {
+  const { currentUser } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [payments, setPayments] = useState<PaymentHistory[]>([]);
 
@@ -33,6 +35,7 @@ export const Reports: React.FC = () => {
   const [endDate, setEndDate] = useState(dayjs().format('YYYY-MM-DD'));
 
   useEffect(() => {
+    if (!currentUser) return;
     const unsubOrders = subscribeOrders(setOrders);
     const unsubPayments = subscribePayments(setPayments);
 
@@ -40,7 +43,7 @@ export const Reports: React.FC = () => {
       unsubOrders();
       unsubPayments();
     };
-  }, []);
+  }, [currentUser]);
 
   // Update date ranges based on preset select
   useEffect(() => {

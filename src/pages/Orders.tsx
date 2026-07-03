@@ -57,6 +57,7 @@ export const Orders: React.FC = () => {
 
   // Subscriptions
   useEffect(() => {
+    if (!currentUser) return;
     const unsubOrders = subscribeOrders(setOrders);
     const unsubPayments = subscribePayments(setPayments);
     // Subscribe to real-time business settings changes
@@ -69,7 +70,7 @@ export const Orders: React.FC = () => {
       unsubPayments();
       settingsUnsubscribe();
     };
-  }, []);
+  }, [currentUser]);
 
   // Expand order if deep-linked
   useEffect(() => {

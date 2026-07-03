@@ -33,18 +33,7 @@ function getCurrentOwnerId(): string {
   return ownerId;
 }
 
-// Module-level shop owner path — shared by all users in the same shop.
-// Set by AuthContext after login so that admin and staff use the same Firestore sub-path.
-let _shopOwnerPath: string | null = null;
-
-export function setShopOwnerPath(path: string) {
-  _shopOwnerPath = path;
-}
-
 function getUsernamePath(): string {
-  // Use the shared shop owner path if set (ensures admin + staff share data)
-  if (_shopOwnerPath) return _shopOwnerPath;
-  // Fallback: derive from the current user's email prefix
   const email = auth?.currentUser?.email;
   if (!email) {
     const uid = auth?.currentUser?.uid;
@@ -64,15 +53,13 @@ export function getDocRef(colName: string, id: string) {
   return doc(db, 'users_data', getUsernamePath(), colName, id);
 }
 
-function getSettingsDocRef() {
-  const ownerId = getCurrentOwnerId();
+function getSettingsDocRef(): DocumentReference | null {
+  const ownerId = auth?.currentUser?.uid;
+  if (!ownerId) return null;
   return getDocRef('settings', ownerId);
 }
 
 function assertResourceOwnedByCurrentUser(resourceOwnerId?: string) {
-  // In a multi-user shop, any authenticated user in the shop can access all shop resources.
-  // We only enforce ownership checks if no shopOwnerPath is set (legacy isolation mode).
-  if (_shopOwnerPath) return; // All users share the shop — access is permitted
   const ownerId = getCurrentOwnerId();
   if (!ownerId || resourceOwnerId !== ownerId) {
     throw new Error('Resource not found or access denied.');
@@ -85,8 +72,6 @@ function dayTime(value?: string): number {
 
 async function assertDocumentOwnedByCurrentUser(ref: DocumentReference, resourceName: string): Promise<void> {
   if (!db) throw new Error('Database not configured');
-  // In a multi-user shop, any authenticated user in the shop can access all shop resources.
-  if (_shopOwnerPath) return; // All users share the shop — access is permitted
   const ownerId = getCurrentOwnerId();
 
   const snapshot = await getDoc(ref);
@@ -499,8 +484,7 @@ export async function createOrder(order: Omit<Order, 'createdBy' | 'createdAt'>)
 
 // Subscribe to Live Orders
 export function subscribeOrders(callback: (orders: Order[]) => void) {
-  const ownerId = getCurrentOwnerId();
-  if (!db || !ownerId) return () => {};
+  if (!db || !auth?.currentUser) return () => {};
   const q = query(getColRef('orders'));
   return onSnapshot(q, (snapshot) => {
     const orders = snapshot.docs
@@ -818,7 +802,9 @@ export async function getBusinessSettings(): Promise<BusinessSettings> {
 
   if (!db) return defaultSettings;
   try {
-    const snap = await getDoc(getSettingsDocRef());
+    const docRef = getSettingsDocRef();
+    if (!docRef) return defaultSettings;
+    const snap = await getDoc(docRef);
     if (snap.exists()) {
       const stored = snap.data() as BusinessSettings;
       const migrated: BusinessSettings = {
@@ -857,13 +843,13 @@ export async function getBusinessSettings(): Promise<BusinessSettings> {
       }
 
       if (changed) {
-        await setDoc(getSettingsDocRef(), migrated, { merge: true });
+        await setDoc(docRef, migrated, { merge: true });
       }
 
       return migrated;
     }
     // Write defaults if not exist
-    await setDoc(getSettingsDocRef(), defaultSettings);
+    await setDoc(docRef, defaultSettings);
     return defaultSettings;
   } catch (e) {
     console.error('Settings lookup failed, using default settings:', e);
@@ -873,14 +859,18 @@ export async function getBusinessSettings(): Promise<BusinessSettings> {
 
 export async function updateBusinessSettings(updates: Partial<BusinessSettings>): Promise<void> {
   if (!db) throw new Error('Database not configured');
-  await setDoc(getSettingsDocRef(), updates, { merge: true });
+  const docRef = getSettingsDocRef();
+  if (!docRef) throw new Error('User must be signed in to update settings.');
+  await setDoc(docRef, updates, { merge: true });
   await logActivity('Settings Updated', 'Updated business configurations');
 }
 
 // Subscribe to Settings changes
 export function subscribeSettings(callback: (settings: BusinessSettings) => void) {
   if (!db) return () => {};
-  return onSnapshot(getSettingsDocRef(), (snapshot) => {
+  const docRef = getSettingsDocRef();
+  if (!docRef) return () => {};
+  return onSnapshot(docRef, (snapshot) => {
     if (snapshot.exists()) {
       callback(snapshot.data() as BusinessSettings);
     }

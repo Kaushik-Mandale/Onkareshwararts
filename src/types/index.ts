@@ -5,9 +5,6 @@ export interface User {
   role: 'admin' | 'staff';
   status: 'active' | 'inactive';
   createdAt: string;
-  /** The Firestore sub-path (shop owner's username) all users of this shop read/write to.
-   *  For admin: their own username. For staff: the admin's username. */
-  ownerPath?: string;
 }
 
 export interface Product {

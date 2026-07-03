@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { 
   addProduct, 
@@ -176,9 +176,10 @@ export const Inventory: React.FC = () => {
 
   // Subscribe to live products
   useEffect(() => {
+    if (!currentUser) return;
     const unsubscribe = subscribeProducts(setProducts);
     return () => unsubscribe();
-  }, []);
+  }, [currentUser]);
 
   // Sync edit product form values
   useEffect(() => {

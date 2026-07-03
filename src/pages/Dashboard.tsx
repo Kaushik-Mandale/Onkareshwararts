@@ -1,5 +1,6 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   subscribeProducts, 
   subscribeOrders, 
@@ -76,6 +77,7 @@ const AnimatedCounter: React.FC<{ value: number; prefix?: string; suffix?: strin
 };
 
 export const Dashboard: React.FC = () => {
+  const { currentUser } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [payments, setPayments] = useState<PaymentHistory[]>([]);
@@ -83,6 +85,7 @@ export const Dashboard: React.FC = () => {
 
   // Subscriptions
   useEffect(() => {
+    if (!currentUser) return;
     const unsubProds = subscribeProducts(setProducts);
     const unsubOrders = subscribeOrders(setOrders);
     const unsubPayments = subscribePayments(setPayments);
@@ -94,7 +97,7 @@ export const Dashboard: React.FC = () => {
       unsubPayments();
       unsubLogs();
     };
-  }, []);
+  }, [currentUser]);
 
   const todayStr = dayjs().format('YYYY-MM-DD');
 
