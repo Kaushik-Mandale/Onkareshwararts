@@ -265,8 +265,15 @@ export const NewBooking: React.FC = () => {
 
     try {
       await createOrder(orderPayload);
-      toast.success('Order booked and saved to Firestore!');
+      toast.success('Order booked! Opening WhatsApp to notify customer...');
       setStep(4);
+
+      // Auto-send WhatsApp message to customer's number
+      const autoMsg = buildWhatsAppMsg(generatedOrderNo, grandTotal, paidAmount, remainingBalance, paymentStatus);
+      const phone = custMobile.trim().replace(/\D/g, '');
+      const waNumber = phone.length === 10 ? `91${phone}` : phone;
+      const waUrl = `https://wa.me/${waNumber}?text=${encodeURIComponent(autoMsg)}`;
+      setTimeout(() => window.open(waUrl, '_blank'), 800);
     } catch (e: any) {
       console.error(e);
       toast.error('Booking failed: ' + e.message);
@@ -337,18 +344,30 @@ export const NewBooking: React.FC = () => {
     let yPos = 92;
     doc.setFont('Helvetica', 'normal');
     doc.setTextColor(50, 50, 50);
-    
+
+    const ROW_H = 22; // taller rows to fit product thumbnail
     cart.forEach((item) => {
-      doc.text(item.product.name, 18, yPos);
-      doc.text(item.product.size, 80, yPos);
-      doc.text(`Rs. ${item.product.sellingPrice.toLocaleString()}`, 115, yPos);
-      doc.text(item.qty.toString(), 150, yPos);
-      doc.text(`Rs. ${(item.product.sellingPrice * item.qty).toLocaleString()}`, 170, yPos);
-      
+      // Product thumbnail on the left
+      if (item.product.photoUrl) {
+        try {
+          doc.addImage(item.product.photoUrl, 'JPEG', 15, yPos - 4, 16, 16);
+        } catch (_) { /* skip if image fails */ }
+      }
+      const textX = item.product.photoUrl ? 34 : 18;
+      doc.setFont('Helvetica', 'bold');
+      doc.text(item.product.name, textX, yPos + 1);
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.text(`Size: ${item.product.size}`, textX, yPos + 6);
+      doc.setFontSize(9);
+      doc.text(`Rs. ${item.product.sellingPrice.toLocaleString()}`, 115, yPos + 3);
+      doc.text(item.qty.toString(), 150, yPos + 3);
+      doc.text(`Rs. ${(item.product.sellingPrice * item.qty).toLocaleString()}`, 170, yPos + 3);
+
       // Bottom border line
       doc.setDrawColor(230, 230, 230);
-      doc.line(15, yPos + 3, 195, yPos + 3);
-      yPos += 9;
+      doc.line(15, yPos + ROW_H - 4, 195, yPos + ROW_H - 4);
+      yPos += ROW_H;
     });
 
     // Calculations Summary
@@ -416,25 +435,40 @@ export const NewBooking: React.FC = () => {
     toast.success('Invoice PDF downloaded!');
   };
 
-  // --- WHATSAPP SHARING ---
-  const handleShareWhatsApp = () => {
-    const textMsg = `*Onkareshwararts Booking Confirmed!* 
--------------------------------
+  // --- WHATSAPP MESSAGE BUILDER ---
+  const buildWhatsAppMsg = (
+    orderNo: string,
+    total: number,
+    paid: number,
+    remaining: number,
+    payStatus: string
+  ) => {
+    const productLines = cart.map(i => `• ${i.product.name} (${i.product.size}) x${i.qty}`).join('\n');
+    return `*🙏 Onkareshwararts – Booking Confirmed!*
+━━━━━━━━━━━━━━━━━━━━━━
 *Shop:* ${businessSettings?.businessName || 'Onkareshwararts'}
-*Order Number:* ${orderId}
+*Order No:* ${orderNo}
 *Customer:* ${custName}
-*Products:* ${cart.map(i => `${i.product.name} (${i.product.size}) x${i.qty}`).join(', ')}
--------------------------------
-*Grand Total:* ₹${grandTotal.toLocaleString()}
-*Paid Deposit:* ₹${paidAmount.toLocaleString()}
-*Remaining Balance:* ₹${remainingBalance.toLocaleString()}
-*Payment Status:* ${paymentStatus}
--------------------------------
-_Open the invoice at the shop to verify payment and confirm pickup from the QR code inside it._`;
 
-    const encodedText = encodeURIComponent(textMsg);
-    const waUrl = `https://wa.me/?text=${encodedText}`;
-    window.open(waUrl, '_blank');
+*Products Booked:*
+${productLines}
+━━━━━━━━━━━━━━━━━━━━━━
+*Grand Total:* ₹${total.toLocaleString()}
+*Paid Deposit:* ₹${paid.toLocaleString()}
+*Remaining Balance:* ₹${remaining.toLocaleString()}
+*Payment Status:* ${payStatus}
+━━━━━━━━━━━━━━━━━━━━━━
+_Bring this booking number to the shop. Open the invoice for the QR code to confirm pickup._
+
+🙏 *Ganpati Bappa Morya!*`;
+  };
+
+  // --- WHATSAPP SHARING (manual button) ---
+  const handleShareWhatsApp = () => {
+    const msg = buildWhatsAppMsg(orderId, grandTotal, paidAmount, remainingBalance, paymentStatus);
+    const phone = custMobile.trim().replace(/\D/g, '');
+    const waNumber = phone.length === 10 ? `91${phone}` : phone;
+    window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
   // --- FILTERS GRID ---
