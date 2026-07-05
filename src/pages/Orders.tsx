@@ -7,11 +7,11 @@ import {
   refundOrder, 
   cancelOrder,
   subscribePayments,
-  getBusinessSettings,
   subscribeSettings,
-  deleteOrder
+  deleteOrder,
+  subscribeProducts
 } from '../firebase/db';
-import type { Order, PaymentHistory } from '../types';
+import type { Order, PaymentHistory, Product } from '../types';
 import { 
   Search, 
   Trash2, 
@@ -36,11 +36,19 @@ export const Orders: React.FC = () => {
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [payments, setPayments] = useState<PaymentHistory[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState(searchParamId);
   const [statusFilter, setStatusFilter] = useState('All');
   const [paymentFilter, setPaymentFilter] = useState('All');
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(searchParamId || null);
   const [businessSettings, setBusinessSettings] = useState<any>(null);
+
+  // Quick photo lookup: productId -> photoUrl
+  const productPhotoMap = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    products.forEach(p => { if (p.photoUrl) map[p.id] = p.photoUrl; });
+    return map;
+  }, [products]);
 
   // Modals / Actions states
   const [paymentModalOrder, setPaymentModalOrder] = useState<Order | null>(null);
@@ -58,18 +66,11 @@ export const Orders: React.FC = () => {
   // Subscriptions
   useEffect(() => {
     if (!currentUser) return;
-    const unsubOrders = subscribeOrders(setOrders);
-    const unsubPayments = subscribePayments(setPayments);
-    // Subscribe to real-time business settings changes
-    const settingsUnsubscribe = subscribeSettings(setBusinessSettings);
-    // Fallback: fetch settings if subscription doesn't work
-    getBusinessSettings().then(setBusinessSettings);
-
-    return () => {
-      unsubOrders();
-      unsubPayments();
-      settingsUnsubscribe();
-    };
+    const unsub1 = subscribeOrders(setOrders);
+    const unsub2 = subscribePayments(setPayments);
+    const unsub3 = subscribeProducts(setProducts);
+    const unsub4 = subscribeSettings(setBusinessSettings);
+    return () => { unsub1(); unsub2(); unsub3(); unsub4(); };
   }, [currentUser]);
 
   // Expand order if deep-linked
@@ -457,9 +458,23 @@ _Open the invoice at the shop to verify payment and confirm pickup from the QR c
                   className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer select-none"
                 >
                   <div className="flex items-center space-x-4">
-                    <div className="h-11 w-11 bg-muted rounded-xl flex items-center justify-center border border-border shrink-0">
-                      <QrCode className="h-5.5 w-5.5 text-muted-foreground" />
-                    </div>
+                    {/* Product thumbnail(s) — show first product photo */}
+                    {(() => {
+                      const firstPhoto = order.products
+                        .map(p => productPhotoMap[p.productId])
+                        .find(Boolean);
+                      return firstPhoto ? (
+                        <img
+                          src={firstPhoto}
+                          alt={order.products[0]?.name}
+                          className="h-11 w-11 rounded-xl object-cover border border-border shrink-0 shadow-sm"
+                        />
+                      ) : (
+                        <div className="h-11 w-11 bg-muted rounded-xl flex items-center justify-center border border-border shrink-0">
+                          <QrCode className="h-5.5 w-5.5 text-muted-foreground" />
+                        </div>
+                      );
+                    })()}
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="font-bold text-sm text-foreground">{order.orderNumber}</h4>
@@ -508,9 +523,22 @@ _Open the invoice at the shop to verify payment and confirm pickup from the QR c
                           <div className="border border-border bg-card rounded-xl overflow-hidden divide-y divide-border/60">
                             {order.products.map((item, idx) => (
                               <div key={idx} className="p-3 flex justify-between items-center text-xs">
-                                <div>
-                                  <p className="font-bold text-foreground">{item.name}</p>
-                                  <p className="text-[10px] text-muted-foreground mt-0.5">Size: {item.size} | Qty: {item.quantity}</p>
+                                <div className="flex items-center gap-3">
+                                  {productPhotoMap[item.productId] ? (
+                                    <img
+                                      src={productPhotoMap[item.productId]}
+                                      alt={item.name}
+                                      className="h-12 w-12 rounded-lg object-cover border border-border shrink-0"
+                                    />
+                                  ) : (
+                                    <div className="h-12 w-12 bg-muted rounded-lg flex items-center justify-center border border-border shrink-0">
+                                      <QrCode className="h-5 w-5 text-muted-foreground" />
+                                    </div>
+                                  )}
+                                  <div>
+                                    <p className="font-bold text-foreground">{item.name}</p>
+                                    <p className="text-[10px] text-muted-foreground mt-0.5">Size: {item.size} | Qty: {item.quantity}</p>
+                                  </div>
                                 </div>
                                 <span className="font-semibold text-foreground">₹{(item.price * item.quantity).toLocaleString()}</span>
                               </div>
