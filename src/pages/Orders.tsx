@@ -43,6 +43,9 @@ export const Orders: React.FC = () => {
   const [expandedOrderId, setExpandedOrderId] = useState<string | null>(searchParamId || null);
   const [businessSettings, setBusinessSettings] = useState<any>(null);
 
+  // Lightbox
+  const [lightboxImg, setLightboxImg] = useState<{ url: string; name: string } | null>(null);
+
   // Quick photo lookup: productId -> photoUrl
   const productPhotoMap = React.useMemo(() => {
     const map: Record<string, string> = {};
@@ -467,7 +470,8 @@ _Open the invoice at the shop to verify payment and confirm pickup from the QR c
                         <img
                           src={firstPhoto}
                           alt={order.products[0]?.name}
-                          className="h-11 w-11 rounded-xl object-cover border border-border shrink-0 shadow-sm"
+                          onClick={(e) => { e.stopPropagation(); setLightboxImg({ url: firstPhoto, name: order.products[0]?.name }); }}
+                          className="h-11 w-11 rounded-xl object-cover border border-border shrink-0 shadow-sm cursor-zoom-in hover:opacity-90 transition-opacity"
                         />
                       ) : (
                         <div className="h-11 w-11 bg-muted rounded-xl flex items-center justify-center border border-border shrink-0">
@@ -528,7 +532,8 @@ _Open the invoice at the shop to verify payment and confirm pickup from the QR c
                                     <img
                                       src={productPhotoMap[item.productId]}
                                       alt={item.name}
-                                      className="h-12 w-12 rounded-lg object-cover border border-border shrink-0"
+                                      onClick={() => setLightboxImg({ url: productPhotoMap[item.productId], name: item.name })}
+                                      className="h-12 w-12 rounded-lg object-cover border border-border shrink-0 cursor-zoom-in hover:opacity-90 transition-opacity"
                                     />
                                   ) : (
                                     <div className="h-12 w-12 bg-muted rounded-lg flex items-center justify-center border border-border shrink-0">
@@ -858,6 +863,31 @@ _Open the invoice at the shop to verify payment and confirm pickup from the QR c
                 Confirm Cancellation
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Lightbox ─────────────────────────────── */}
+      {lightboxImg && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(6px)' }}
+          onClick={() => setLightboxImg(null)}
+        >
+          <div className="relative max-w-lg w-full" onClick={e => e.stopPropagation()}>
+            {/* Close button */}
+            <button
+              onClick={() => setLightboxImg(null)}
+              className="absolute -top-3 -right-3 z-10 h-8 w-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/25 text-white transition-colors cursor-pointer"
+            >
+              ✕
+            </button>
+            <img
+              src={lightboxImg.url}
+              alt={lightboxImg.name}
+              className="w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl border border-white/10"
+            />
+            <p className="text-center text-white/70 text-xs font-semibold mt-3 tracking-wide">{lightboxImg.name}</p>
           </div>
         </div>
       )}
